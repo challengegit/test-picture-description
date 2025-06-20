@@ -1,27 +1,48 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <title>私の最初のウェブサイト</title>
-    
-    <!-- ここからCSSを追加 -->
-    <style>
-      img {
-        display: block; /* 画像をブロック要素として扱う */
-        margin-bottom: 15px; /* 各画像の下に15ピクセルの間隔を空ける */
+<!-- <script>タグの中身を、以下の内容に置き換える -->
+<script>
+  // HTMLの部品を取得
+  const questionInput = document.getElementById('question-input');
+  const askButton = document.getElementById('ask-button');
+  const answerArea = document.getElementById('answer-area');
+
+  // 「質問する」ボタンがクリックされた時の処理
+  askButton.addEventListener('click', async function() {
+    const userQuestion = questionInput.value;
+    if (!userQuestion) {
+      answerArea.textContent = '質問を入力してください。';
+      return;
+    }
+
+    // 答えの表示を「考え中...」に更新
+    answerArea.textContent = 'AIが考えています...';
+    askButton.disabled = true; // ボタンを一時的に無効化
+
+    try {
+      // 私たちのサーバー(/ask)に質問を送信する
+      const response = await fetch('/ask', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ question: userQuestion }),
+      });
+
+      // サーバーからの返事を待つ
+      const data = await response.json();
+
+      if (response.ok) {
+        // 成功したら答えを表示
+        answerArea.textContent = data.answer;
+      } else {
+        // エラーだったらエラーメッセージを表示
+        answerArea.textContent = 'エラーが発生しました: ' + data.error;
       }
-    </style>
-    <!-- ここまでCSS -->
 
-</head>
-<body>
-    <h1>こんにちは、Codespaces!</h1>
-    <p>ブラウザだけでウェブサイトを作ることができました。</p>
-    
-    <!-- <br>タグを削除する -->
-    <img src="images/シロクマ.png" alt="画像の説明">
-    <img src="images/バス.png" alt="画像の説明">
-    <img src="images/家.png" alt="画像の説明">
-
-</body>
-</html>
+    } catch (error) {
+      console.error('通信エラー:', error);
+      answerArea.textContent = 'サーバーとの通信に失敗しました。';
+    } finally {
+      askButton.disabled = false; // ボタンを再度有効化
+    }
+  });
+</script>
