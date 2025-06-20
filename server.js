@@ -6,6 +6,11 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const app = express();
 app.use(express.json()); // JSON形式のリクエストを扱えるようにする
 
+// ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+// ★  この一行が、最も重要です！  ★
+// ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+app.use(express.static('.'));
+
 // GitHub SecretsからAPIキーを読み込む
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 if (!GEMINI_API_KEY) {
