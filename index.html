@@ -1,48 +1,93 @@
-<!-- <script>タグの中身を、以下の内容に置き換える -->
-<script>
-  // HTMLの部品を取得
-  const questionInput = document.getElementById('question-input');
-  const askButton = document.getElementById('ask-button');
-  const answerArea = document.getElementById('answer-area');
-
-  // 「質問する」ボタンがクリックされた時の処理
-  askButton.addEventListener('click', async function() {
-    const userQuestion = questionInput.value;
-    if (!userQuestion) {
-      answerArea.textContent = '質問を入力してください。';
-      return;
-    }
-
-    // 答えの表示を「考え中...」に更新
-    answerArea.textContent = 'AIが考えています...';
-    askButton.disabled = true; // ボタンを一時的に無効化
-
-    try {
-      // 私たちのサーバー(/ask)に質問を送信する
-      const response = await fetch('/ask', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ question: userQuestion }),
-      });
-
-      // サーバーからの返事を待つ
-      const data = await response.json();
-
-      if (response.ok) {
-        // 成功したら答えを表示
-        answerArea.textContent = data.answer;
-      } else {
-        // エラーだったらエラーメッセージを表示
-        answerArea.textContent = 'エラーが発生しました: ' + data.error;
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>私の最初のウェブサイト</title>
+    <style>
+      img {
+        display: block; /* 画像をブロック要素として扱う */
+        margin-bottom: 15px; /* 各画像の下に15ピクセルの間隔を空ける */
       }
+      /* Q&Aセクションの見た目を少し整える */
+      #qa-section {
+        margin-top: 40px;
+        padding: 20px;
+        border-top: 2px solid #eee;
+      }
+    </style>
+</head>
+<body>
 
-    } catch (error) {
-      console.error('通信エラー:', error);
-      answerArea.textContent = 'サーバーとの通信に失敗しました。';
-    } finally {
-      askButton.disabled = false; // ボタンを再度有効化
-    }
-  });
-</script>
+    <h1>こんにちは、Codespaces!</h1>
+    <p>ブラウザだけでウェブサイトを作ることができました。</p>
+    
+    <img src="images/シロクマ.png" alt="シロクマの画像">
+    <img src="images/バス.png" alt="バスの画像">
+    <img src="images/家.png" alt="家の画像">
+
+    <!-- Q&Aセクション -->
+    <div id="qa-section">
+        <h2>AIに質問してみよう！</h2>
+        <p>「シロクマの名前は？」や「バスは何色？」のように質問してね。</p>
+
+        <input type="text" id="question-input" placeholder="ここに質問を入力...">
+        <button id="ask-button">質問する</button>
+
+        <h3>答え：</h3>
+        <p id="answer-area">ここに答えが表示されます</p>
+    </div>
+
+
+    <!-- ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+         ★  ここが正しい場所です！ </body>タグの直前に<script>を置きます。 ★
+         ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★ -->
+    <script>
+      // HTMLの部品を取得
+      const questionInput = document.getElementById('question-input');
+      const askButton = document.getElementById('ask-button');
+      const answerArea = document.getElementById('answer-area');
+
+      // 「質問する」ボタンがクリックされた時の処理
+      askButton.addEventListener('click', async function() {
+        const userQuestion = questionInput.value;
+        if (!userQuestion) {
+          answerArea.textContent = '質問を入力してください。';
+          return;
+        }
+
+        // 答えの表示を「考え中...」に更新
+        answerArea.textContent = 'AIが考えています...';
+        askButton.disabled = true; // ボタンを一時的に無効化
+
+        try {
+          // 私たちのサーバー(/ask)に質問を送信する
+          const response = await fetch('/ask', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ question: userQuestion }),
+          });
+
+          // サーバーからの返事を待つ
+          const data = await response.json();
+
+          if (response.ok) {
+            // 成功したら答えを表示
+            answerArea.textContent = data.answer;
+          } else {
+            // エラーだったらエラーメッセージを表示
+            answerArea.textContent = 'エラーが発生しました: ' + data.error;
+          }
+
+        } catch (error) {
+          console.error('通信エラー:', error);
+          answerArea.textContent = 'サーバーとの通信に失敗しました。';
+        } finally {
+          askButton.disabled = false; // ボタンを再度有効化
+        }
+      });
+    </script>
+
+</body>
+</html>
