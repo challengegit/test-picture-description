@@ -2,11 +2,14 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>私の最初のウェブサイト</title>
+    <title>私の猫ちゃんたち</title>
     <style>
       img {
         display: block; /* 画像をブロック要素として扱う */
         margin-bottom: 15px; /* 各画像の下に15ピクセルの間隔を空ける */
+        max-width: 400px; /* 画像が大きくなりすぎないように最大幅を指定 */
+        border-radius: 8px; /* 画像の角を少し丸くする */
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1); /* 画像に影をつけて立体感を出す */
       }
       /* Q&Aセクションの見た目を少し整える */
       #qa-section {
@@ -18,17 +21,21 @@
 </head>
 <body>
 
-    <h1>こんにちは、Codespaces!</h1>
+    <h1>こんにちは、私の可愛い猫ちゃんたち！</h1>
     <p>ブラウザだけでウェブサイトを作ることができました。</p>
     
-    <img src="images/シロクマ.png" alt="シロクマの画像">
-    <img src="images/バス.png" alt="バスの画像">
-    <img src="images/家.png" alt="家の画像">
+    <!-- ▼▼▼ ここを猫の画像に差し替えました ▼▼▼ -->
+    <img src="images/pino.jpg" alt="猫のぴの">
+    <img src="images/teto.jpg" alt="猫のてと">
+    <img src="images/ruka.jpg" alt="猫のるか">
+    <img src="images/abi.jpg" alt="猫のあび">
+    <!-- ▲▲▲ ここまで ▲▲▲ -->
+
 
     <!-- Q&Aセクション -->
     <div id="qa-section">
         <h2>AIに質問してみよう！</h2>
-        <p>「シロクマの名前は？」や「バスは何色？」のように質問してね。</p>
+        <p>「ぴのの名前は？」や「てとは何してる？」のように質問してね。</p>
 
         <input type="text" id="question-input" placeholder="ここに質問を入力...">
         <button id="ask-button">質問する</button>
@@ -37,11 +44,6 @@
         <p id="answer-area">ここに答えが表示されます</p>
     </div>
 
-
-    <!-- ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-         ★  ここが正しい場所です！ </body>タグの直前に<script>を置きます。 ★
-         ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★ -->
-    <script>
       // HTMLの部品を取得
       const questionInput = document.getElementById('question-input');
       const askButton = document.getElementById('ask-button');
