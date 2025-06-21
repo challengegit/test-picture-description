@@ -4,13 +4,27 @@
     <meta charset="UTF-8">
     <title>私の猫ちゃんたち</title>
     <style>
+      /* ▼▼▼ CSSの変更点 ▼▼▼ */
+      /* 猫の写真と名前を囲むコンテナのスタイル */
+      .cat-container {
+        margin-bottom: 25px; /* 各猫のブロックの下に十分な間隔を空ける */
+      }
+
+      /* 猫の名前のスタイル */
+      .cat-container h3 {
+        margin-bottom: 5px; /* 名前と画像の間の余白を調整 */
+      }
+
+      /* 画像のスタイル */
       img {
         display: block; /* 画像をブロック要素として扱う */
-        margin-bottom: 15px; /* 各画像の下に15ピクセルの間隔を空ける */
+        /* margin-bottom は .cat-container に移動したので削除 */
         max-width: 400px; /* 画像が大きくなりすぎないように最大幅を指定 */
         border-radius: 8px; /* 画像の角を少し丸くする */
         box-shadow: 0 4px 8px rgba(0,0,0,0.1); /* 画像に影をつけて立体感を出す */
       }
+      /* ▲▲▲ ここまで ▲▲▲ */
+
       /* Q&Aセクションの見た目を少し整える */
       #qa-section {
         margin-top: 40px;
@@ -24,11 +38,26 @@
     <h1>こんにちは、私の可愛い猫ちゃんたち！</h1>
     <p>ブラウザだけでウェブサイトを作ることができました。</p>
     
-    <!-- ▼▼▼ 猫の画像 ▼▼▼ -->
-    <img src="images/pino.jpg" alt="猫のぴの">
-    <img src="images/teto.jpg" alt="猫のてと">
-    <img src="images/ruka.jpg" alt="猫のるか">
-    <img src="images/abi.jpg" alt="猫のあび">
+    <!-- ▼▼▼ HTMLの変更点 ▼▼▼ -->
+    <div class="cat-container">
+      <h3>１：ぴの</h3>
+      <img src="images/pino.jpg" alt="猫のぴの">
+    </div>
+
+    <div class="cat-container">
+      <h3>２：てと</h3>
+      <img src="images/teto.jpg" alt="猫のてと">
+    </div>
+
+    <div class="cat-container">
+      <h3>３：るか</h3>
+      <img src="images/ruka.jpg" alt="猫のるか">
+    </div>
+
+    <div class="cat-container">
+      <h3>４：あび</h3>
+      <img src="images/abi.jpg" alt="猫のあび">
+    </div>
     <!-- ▲▲▲ ここまで ▲▲▲ -->
 
 
@@ -44,7 +73,6 @@
         <p id="answer-area">ここに答えが表示されます</p>
     </div>
 
-    <!-- ▼▼▼ ここが修正点です！JavaScriptのコードを<script>タグで囲みます ▼▼▼ -->
     <script>
       // HTMLの部品を取得
       const questionInput = document.getElementById('question-input');
@@ -92,7 +120,6 @@
         }
       });
     </script>
-    <!-- ▲▲▲ ここまで ▲▲▲ -->
 
 </body>
 </html>
