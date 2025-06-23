@@ -3,84 +3,195 @@
 <head>
     <meta charset="UTF-8">
     <title>私の猫ちゃんたち</title>
+    <!-- ▼▼▼ ビューポート設定を追加（スマホ表示で重要） ▼▼▼ -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-      /* 猫の写真と名前を囲むコンテナのスタイル */
+      /* ▼▼▼ CSSを2分割レイアウト用に大幅に変更します ▼▼▼ */
+
+      /* 基本設定 */
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans CJK JP", "Yu Gothic", sans-serif;
+        color: #333;
+        overflow: hidden; /* ページ全体のスクロールを禁止 */
+      }
+
+      /* 2分割画面の親コンテナ */
+      .main-container {
+        display: flex; /* Flexboxを有効化して子要素を横に並べる */
+        height: 100vh; /* 画面の高さいっぱいに広げる */
+      }
+
+      /* 左側：猫写真エリア（スクロールする側） */
+      .cats-area {
+        flex: 1; /* 残りのスペースをすべて使う */
+        overflow-y: auto; /* 縦方向にはみ出したらスクロールバーを表示 */
+        padding: 24px;
+        box-sizing: border-box; /* paddingを含めて幅を計算 */
+      }
+      
+      .cats-area h1 {
+        margin-top: 0;
+      }
+
+      /* 右側：Q&Aエリア（固定する側） */
+      #qa-section {
+        flex-basis: 450px; /* 幅を450pxに固定 */
+        flex-shrink: 0;   /* 画面が狭くなってもこのエリアは縮まないようにする */
+        padding: 24px;
+        border-left: 1px solid #ddd; /* 左側に境界線 */
+        box-sizing: border-box; /* paddingを含めて幅を計算 */
+        display: flex; /* 中の要素を縦に配置するため */
+        flex-direction: column;
+        background-color: #f9f9f9;
+        height: 100%; /* 親の高さに合わせる */
+      }
+      
+      #qa-section h2 {
+          margin-top: 0;
+      }
+
+      /* 入力フォームとボタンのスタイル */
+      #question-input {
+        width: 100%;
+        padding: 10px;
+        font-size: 16px;
+        box-sizing: border-box;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        margin-bottom: 10px;
+      }
+
+      #ask-button {
+        width: 100%;
+        padding: 12px;
+        font-size: 16px;
+        font-weight: bold;
+        color: white;
+        background-color: #007bff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+      #ask-button:hover:not(:disabled) {
+        background-color: #0056b3;
+      }
+      #ask-button:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+      
+      /* 回答エリアのスタイル */
+      #answer-container {
+        margin-top: 20px;
+        flex-grow: 1; /* 残りの高さをすべて使う */
+        overflow-y: auto; /* 回答が長くなったらスクロール */
+        background-color: #fff;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 16px;
+      }
+      
+      #answer-area {
+        white-space: pre-wrap; /* 改行(\n)を正しく表示 */
+        word-wrap: break-word; /* 長い単語でも折り返す */
+        margin: 0; /* pタグのデフォルトマージンをリセット */
+      }
+      
+      /* 個々の猫のスタイル */
       .cat-container {
         margin-bottom: 25px;
       }
-
-      /* 猫の名前のスタイル */
       .cat-container h3 {
         margin-bottom: 5px;
       }
-
-      /* 画像のスタイル */
-      img {
+      .cat-container img {
         display: block;
-        max-width: 400px;
+        max-width: 100%; /* 横幅いっぱいに広がるように変更 */
+        height: auto;
         border-radius: 8px;
         box-shadow: 0 4px 8px rgba(0,0,0,0.1);
       }
 
-      /* Q&Aセクションの見た目を少し整える */
-      #qa-section {
-        margin-top: 40px;
-        padding: 20px;
-        border-top: 2px solid #eee;
+      /* 【おまけ】スマホなどの小さい画面用の設定 */
+      @media (max-width: 768px) {
+        html, body {
+            overflow: auto; /* ページ全体のスクロールを許可 */
+        }
+        .main-container {
+          flex-direction: column; /* 横並びから縦並びに変更 */
+          height: auto; /* 高さを自動に */
+        }
+        .cats-area {
+          overflow-y: visible; /* スクロールを解除（ページ全体がスクロールする） */
+        }
+        #qa-section {
+          flex-basis: auto; /* 幅固定を解除 */
+          border-left: none; /* 左の線を消す */
+          border-top: 2px solid #ddd; /* 上に境界線を引く */
+        }
       }
-
-      /* ▼▼▼ ここにCSSを追加します ▼▼▼ */
-      #answer-area {
-        /* この一行が、AIの回答に含まれる改行文字(\n)を正しく表示させます */
-        white-space: pre-wrap;
-      }
-      /* ▲▲▲ ここまで ▲▲▲ */
+      /* ▲▲▲ CSSの変更はここまで ▲▲▲ */
     </style>
 </head>
 <body>
 
-    <h1>こんにちは、私の可愛い猫ちゃんたち！</h1>
-    
-    <div class="cat-container">
-      <h3>１：ぴの</h3>
-      <img src="images/pino.jpg" alt="猫のぴの">
+    <!-- ▼▼▼ HTMLの構造を2分割用に変更します ▼▼▼ -->
+    <div class="main-container">
+
+        <!-- 左側のエリア：猫の写真リスト -->
+        <div class="cats-area">
+            <h1>こんにちは、私の可愛い猫ちゃんたち！</h1>
+            
+            <div class="cat-container">
+              <h3>１：ぴの</h3>
+              <img src="images/pino.jpg" alt="猫のぴの">
+            </div>
+        
+            <div class="cat-container">
+              <h3>２：てと</h3>
+              <img src="images/teto.jpg" alt="猫のてと">
+            </div>
+        
+            <div class="cat-container">
+              <h3>３：るか</h3>
+              <img src="images/ruka.jpg" alt="猫のるか">
+            </div>
+        
+            <div class="cat-container">
+              <h3>４：あび</h3>
+              <img src="images/abi.jpg" alt="猫のあび">
+            </div>
+        </div>
+
+        <!-- 右側のエリア：Q&Aセクション -->
+        <div id="qa-section">
+            <h2>AIに質問してみよう！</h2>
+            <p style="margin-top:0;">「全員紹介して」や「てとは何してる？」のように質問してね。</p>
+
+            <input type="text" id="question-input" placeholder="ここに質問を入力...">
+            <button id="ask-button">質問する</button>
+
+            <!-- 回答表示部分をコンテナで囲む（回答エリアもスクロール可能にするため） -->
+            <div id="answer-container">
+                <h3>答え：</h3>
+                <p id="answer-area">ここに答えが表示されます</p>
+            </div>
+        </div>
+
     </div>
+    <!-- ▲▲▲ HTMLの構造変更はここまで ▲▲▲ -->
 
-    <div class="cat-container">
-      <h3>２：てと</h3>
-      <img src="images/teto.jpg" alt="猫のてと">
-    </div>
-
-    <div class="cat-container">
-      <h3>３：るか</h3>
-      <img src="images/ruka.jpg" alt="猫のるか">
-    </div>
-
-    <div class="cat-container">
-      <h3>４：あび</h3>
-      <img src="images/abi.jpg" alt="猫のあび">
-    </div>
-
-
-    <!-- Q&Aセクション -->
-    <div id="qa-section">
-        <h2>AIに質問してみよう！</h2>
-        <p>「全員紹介して」や「てとは何してる？」のように質問してね。</p>
-
-        <input type="text" id="question-input" placeholder="ここに質問を入力...">
-        <button id="ask-button">質問する</button>
-
-        <h3>答え：</h3>
-        <p id="answer-area">ここに答えが表示されます</p>
-    </div>
 
     <script>
-      // HTMLの部品を取得
+      // scriptタグの中身は変更ありません
       const questionInput = document.getElementById('question-input');
       const askButton = document.getElementById('ask-button');
       const answerArea = document.getElementById('answer-area');
 
-      // 「質問する」ボタンがクリックされた時の処理
       askButton.addEventListener('click', async function() {
         const userQuestion = questionInput.value;
         if (!userQuestion) {
@@ -88,28 +199,21 @@
           return;
         }
 
-        // 答えの表示を「考え中...」に更新
         answerArea.textContent = 'AIが考えています...';
         askButton.disabled = true;
 
         try {
-          // 私たちのサーバー(/ask)に質問を送信する
           const response = await fetch('/ask', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ question: userQuestion }),
           });
 
-          // サーバーからの返事を待つ
           const data = await response.json();
 
           if (response.ok) {
-            // 成功したら答えを表示
             answerArea.textContent = data.answer;
           } else {
-            // エラーだったらエラーメッセージを表示
             answerArea.textContent = 'エラーが発生しました: ' + data.error;
           }
 
