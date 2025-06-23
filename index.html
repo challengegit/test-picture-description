@@ -4,26 +4,23 @@
     <meta charset="UTF-8">
     <title>私の猫ちゃんたち</title>
     <style>
-      /* ▼▼▼ CSSの変更点 ▼▼▼ */
       /* 猫の写真と名前を囲むコンテナのスタイル */
       .cat-container {
-        margin-bottom: 25px; /* 各猫のブロックの下に十分な間隔を空ける */
+        margin-bottom: 25px;
       }
 
       /* 猫の名前のスタイル */
       .cat-container h3 {
-        margin-bottom: 5px; /* 名前と画像の間の余白を調整 */
+        margin-bottom: 5px;
       }
 
       /* 画像のスタイル */
       img {
-        display: block; /* 画像をブロック要素として扱う */
-        /* margin-bottom は .cat-container に移動したので削除 */
-        max-width: 400px; /* 画像が大きくなりすぎないように最大幅を指定 */
-        border-radius: 8px; /* 画像の角を少し丸くする */
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1); /* 画像に影をつけて立体感を出す */
+        display: block;
+        max-width: 400px;
+        border-radius: 8px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
       }
-      /* ▲▲▲ ここまで ▲▲▲ */
 
       /* Q&Aセクションの見た目を少し整える */
       #qa-section {
@@ -31,6 +28,13 @@
         padding: 20px;
         border-top: 2px solid #eee;
       }
+
+      /* ▼▼▼ ここにCSSを追加します ▼▼▼ */
+      #answer-area {
+        /* この一行が、AIの回答に含まれる改行文字(\n)を正しく表示させます */
+        white-space: pre-wrap;
+      }
+      /* ▲▲▲ ここまで ▲▲▲ */
     </style>
 </head>
 <body>
@@ -38,7 +42,6 @@
     <h1>こんにちは、私の可愛い猫ちゃんたち！</h1>
     <p>ブラウザだけでウェブサイトを作ることができました。</p>
     
-    <!-- ▼▼▼ HTMLの変更点 ▼▼▼ -->
     <div class="cat-container">
       <h3>１：ぴの</h3>
       <img src="images/pino.jpg" alt="猫のぴの">
@@ -58,7 +61,6 @@
       <h3>４：あび</h3>
       <img src="images/abi.jpg" alt="猫のあび">
     </div>
-    <!-- ▲▲▲ ここまで ▲▲▲ -->
 
 
     <!-- Q&Aセクション -->
@@ -89,7 +91,7 @@
 
         // 答えの表示を「考え中...」に更新
         answerArea.textContent = 'AIが考えています...';
-        askButton.disabled = true; // ボタンを一時的に無効化
+        askButton.disabled = true;
 
         try {
           // 私たちのサーバー(/ask)に質問を送信する
@@ -116,7 +118,7 @@
           console.error('通信エラー:', error);
           answerArea.textContent = 'サーバーとの通信に失敗しました。';
         } finally {
-          askButton.disabled = false; // ボタンを再度有効化
+          askButton.disabled = false;
         }
       });
     </script>
