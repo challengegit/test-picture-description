@@ -18,7 +18,7 @@ if (!GEMINI_API_KEY) {
 
 // Google AIクライアントを初期化
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' }); // 最新の高速モデルを使用
+const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
 // '/ask' というURLで質問を受け付ける口（APIエンドポイント）を作る
 app.post('/ask', async (req, res) => {
@@ -28,11 +28,6 @@ app.post('/ask', async (req, res) => {
       return res.status(400).json({ error: '質問がありません。' });
     }
 
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-    // ★ ここからが、AIに役割を教えるための魔法です ★
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-    
-    // AIへの事前指示を作成
     const systemPrompt = `
       あなたは、私のウェブサイトに展示されている4枚の猫の写真について答える、フレンドリーなAIアシスタントです。
       以下の情報だけを元に、ユーザーの質問に答えてください。他の一般的な知識は使わないでください。
@@ -82,26 +77,44 @@ app.post('/ask', async (req, res) => {
         - 猫じゃらしで遊んでほしくて、猫じゃらしを収めているクローゼットの前で、こちらを時々見つめてきます。
     `;
 
-    // ユーザーの質問と事前指示を組み合わせてAIに投げる
-    const result = await model.generateContent(systemPrompt + "\n\nユーザーの質問: " + userQuestion);
-
     // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-    // ★ 魔法はここまでです ★
+    // ★ ここからが、ストリーミングのための変更点です ★
     // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
 
-    const response = await result.response;
-    const answer = response.text();
+    // ストリーミング形式でAIにリクエスト
+    const result = await model.generateContentStream(systemPrompt + "\n\nユーザーの質問: " + userQuestion);
 
-    // 答えをフロントエンドに返す
-    res.json({ answer: answer });
+    // フロントエンドに「これからストリームを送るよ」と伝えるためのヘッダー設定
+    res.writeHead(200, {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Transfer-Encoding': 'chunked',
+    });
+
+    // AIからの応答が少しずつ届くので、届くたびにフロントエンドに送信する
+    for await (const chunk of result.stream) {
+      const chunkText = chunk.text();
+      res.write(chunkText); // 届いたテキストの断片をそのまま書き込む
+    }
+
+    // 全ての送信が終わったことを伝える
+    res.end();
+
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+    // ★ 変更はここまでです ★
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
 
   } catch (error) {
     console.error('AIからの応答取得中にエラーが発生しました:', error);
-    res.status(500).json({ error: 'AIとの通信中にエラーが発生しました。' });
+    // ストリーム開始前のエラーならstatusを返せるが、開始後だと難しい
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'AIとの通信中にエラーが発生しました。' });
+    } else {
+      // ストリームが始まってしまった後は、接続を閉じるしかない
+      res.end();
+    }
   }
 });
 
-// サーバーを起動するポート番号を指定
 const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`サーバーがポート${PORT}で起動しました。 http://localhost:${PORT}`);
