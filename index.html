@@ -24,7 +24,15 @@
       #answer-area { white-space: pre-wrap; word-wrap: break-word; margin: 0; }
       .cat-container { margin-bottom: 25px; }
       .cat-container h3 { margin-bottom: 5px; }
-      .cat-container img { display: block; max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+      /* ★★★★★ ここを正しい形に戻しました ★★★★★ */
+      .cat-container img {
+          display: block;
+          max-width: 100%;
+          height: auto;
+          border-radius: 8px;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      }
+      /* ★★★★★★★★★★★★★★★★★★★★★★★★★ */
       @media (max-width: 768px) {
         html, body { overflow: auto; }
         .main-container { flex-direction: column; height: auto; }
@@ -39,10 +47,12 @@
         <!-- 左側のエリア -->
         <div class="cats-area">
             <h1>こんにちは、私の可愛い猫ちゃんたち！</h1>
-            <div class="cat-container"><h3>１：ぴの</h3><img src="images/pino.jpg" alt="猫のぴの"></div>
-            <div class="cat-container"><h3>２：てと</h3><img src="images/teto.jpg" alt="猫のてと"></div>
-            <div class="cat-container"><h3>３：るか</h3><img src="images/ruka.jpg" alt="猫のるか"></div>
-            <div class="cat-container"><h3>４：あび</h3><img src="images/abi.jpg" alt="猫のあび"></div>
+            <div class="cat-container"><h3>１：ぴの</h3><img src="images/pino.jpg" alt="猫の「ぴの」"></div>
+            <div class="cat-container"><h3>２：てと</h3><img src="images/teto.jpg" alt="猫の「てと」"></div>
+            <div class="cat-container"><h3>３：るか</h3><img src="images/ruka.jpg" alt="猫の「るか」"></div>
+            <div class="cat-container"><h3>４：あび</h3><img src="images/abi.jpg" alt="猫の「あび」"></div>
+            <div class="cat-container"><h3>５：べる</h3><img src="images/bell.JPG" alt="猫の「べる」"></div>
+            <div class="cat-container"><h3>６：れん</h3><img src="images/ren.JPG" alt="猫の「れん」"></div>
         </div>
         <!-- ドラッグする「つまみ」 -->
         <div class="resizer" id="drag-handle"></div>
@@ -60,13 +70,7 @@
     </div>
 
     <script>
-      // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-      // ★ スクリプト全体をこのイベントリスナーで囲みます！ ★
-      // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
       document.addEventListener('DOMContentLoaded', function() {
-        
-        // これ以降のコードは、HTMLの準備が完全に整ってから実行されるので安全です
-
         const questionInput = document.getElementById('question-input');
         const askButton = document.getElementById('ask-button');
         const answerArea = document.getElementById('answer-area');
@@ -131,7 +135,7 @@
           document.addEventListener('mouseup', mouseUpHandler);
         });
 
-      }); // ★★★★★ イベントリスナーの閉じカッコ ★★★★★
+      });
     </script>
 
 </body>
