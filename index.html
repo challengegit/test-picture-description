@@ -24,7 +24,6 @@
       #answer-area { white-space: pre-wrap; word-wrap: break-word; margin: 0; }
       .cat-container { margin-bottom: 25px; }
       .cat-container h3 { margin-bottom: 5px; }
-      /* ★★★★★ ここを正しい形に戻しました ★★★★★ */
       .cat-container img {
           display: block;
           max-width: 100%;
@@ -32,7 +31,6 @@
           border-radius: 8px;
           box-shadow: 0 4px 8px rgba(0,0,0,0.1);
       }
-      /* ★★★★★★★★★★★★★★★★★★★★★★★★★ */
       @media (max-width: 768px) {
         html, body { overflow: auto; }
         .main-container { flex-direction: column; height: auto; }
@@ -59,7 +57,8 @@
         <!-- 右側のエリア -->
         <div id="qa-section">
             <h2>AIに質問してみよう！</h2>
-            <p style="margin-top:0;">「全員紹介して」や「てとは何してる？」のように質問してね。</p>
+            <!-- ★★★★★ 質問の例文を修正しました ★★★★★ -->
+            <p style="margin-top:0;">「ぴのは写真で何してる？」や「全員紹介して」のように質問してね。</p>
             <input type="text" id="question-input" placeholder="ここに質問を入力...">
             <button id="ask-button">質問する</button>
             <div id="answer-container">
@@ -83,7 +82,8 @@
           }
 
           askButton.disabled = true;
-          answerArea.textContent = '';
+          // ★ ユーザーが質問するたびにローディングメッセージを表示するように変更
+          answerArea.textContent = 'AIが考えています...';
           
           try {
             const response = await fetch('/ask', {
@@ -96,7 +96,9 @@
               const errorData = await response.json();
               throw new Error(errorData.error || 'サーバーでエラーが発生しました。');
             }
-
+            
+            // ★ ストリームの最初のデータを受け取る前に回答エリアをクリア
+            let isFirstChunk = true;
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             
@@ -104,6 +106,10 @@
               const { value, done } = await reader.read();
               if (done) {
                 break;
+              }
+              if(isFirstChunk) {
+                answerArea.textContent = ''; // 最初のチャンク受信時にクリア
+                isFirstChunk = false;
               }
               const chunkText = decoder.decode(value);
               answerArea.textContent += chunkText;
@@ -114,6 +120,14 @@
           } finally {
             askButton.disabled = false;
           }
+        });
+
+        // 質問入力欄でEnterキーを押しても質問できるようにする
+        questionInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // フォームのデフォルト送信を防ぐ
+                askButton.click(); // ボタンのクリックイベントを発火させる
+            }
         });
 
         const resizer = document.getElementById('drag-handle');

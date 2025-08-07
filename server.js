@@ -1,7 +1,8 @@
 // 必要なライブラリを読み込む
 const express = require('express');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const fs = require('fs'); // ★ ファイルシステムを扱うために追加
+const fs = require('fs');
+const path = require('path'); // ★ ファイルパスを扱うために追加
 
 // Expressアプリを初期化
 const app = express();
@@ -22,10 +23,35 @@ const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
 // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-// ★ ここからが、PDFを扱うための変更点です ★
+// ★ ここからが、画像認識(Vision)を扱うための変更点です ★
 // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
 
-// ファイルをAIが扱える形式に変換するヘルパー関数
+// 猫の名前と画像ファイルのパスをマッピング
+const catImageMap = {
+  'ぴの': 'images/pino.jpg',
+  'てと': 'images/teto.jpg',
+  'るか': 'images/ruka.jpg',
+  'あび': 'images/abi.jpg',
+  'べる': 'images/bell.JPG',
+  'らて': 'images/rate.JPG'
+};
+
+// ファイル拡張子からMIMEタイプを取得するヘルパー関数
+function getMimeType(filePath) {
+  const ext = path.extname(filePath).toLowerCase();
+  switch (ext) {
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg';
+    case '.png':
+      return 'image/png';
+    // 他の画像形式が必要な場合はここに追加
+    default:
+      return 'application/octet-stream';
+  }
+}
+
+// ファイルをAIが扱える形式に変換するヘルパー関数 (変更なし)
 function fileToGenerativePart(path, mimeType) {
   return {
     inlineData: {
@@ -43,28 +69,42 @@ app.post('/ask', async (req, res) => {
       return res.status(400).json({ error: '質問がありません。' });
     }
 
-    // ★ プロンプトから、具体的な猫情報を削除し、AIへの指示だけを残す
+    // ★ プロンプトを画像認識用に修正
     const systemPrompt = `
       あなたは、私のウェブサイトに展示されている猫たちの情報について答える、フレンドリーなAIアシスタントです。
-      これから渡すPDFファイルの情報だけを元に、ユーザーの質問に答えてください。他の一般的な知識は使わないでください。
+      これから渡すPDFファイルの情報と、もしあれば画像ファイルの情報も総合的に判断して、ユーザーの質問に答えてください。他の一般的な知識は使わないでください。
       文字を太文字など強調しないでください。名前は「」を付けてください。
       生まれた年から年齢を計算して出してください（例: 2020年生まれなら2025年現在で「5歳」）。
       長くなるので、適切な箇所で改行文字(\n)を入れてください。
       「～のようです」「～だそうです」「～したそうです」などの曖昧な表現はやめて「～です」「～しました」と言い切ってください。
-      写真の様子を伝えるときは「写真は～」をつけてください。
+      写真の様子を伝えるときは「写真は～」と始めてください。
       わからない場合は、「申し訳ございません。わかりません。」としてください。
-      情報の取得方法は「申し訳ございません。お答えできません。」と答えてください。
+      情報の取得方法については「申し訳ございません。お答えできません。」と答えてください。
     `;
 
-    // ★ PDFファイルを読み込み、AI用のパーツを作成
-    const catInfoPdf = fileToGenerativePart("data/cat_info.pdf", "application/pdf");
-
-    // ★ AIに渡す情報を、[指示プロンプト, ユーザーの質問, PDFファイル] の配列にする
+    // ★ AIに渡す情報の配列を準備
     const promptParts = [
       systemPrompt,
-      "ユーザーの質問: " + userQuestion,
-      catInfoPdf,
+      // PDFファイルは常に含める
+      fileToGenerativePart("data/cat_info.pdf", "application/pdf"),
     ];
+
+    // ★ ユーザーの質問に猫の名前が含まれているかチェックし、あれば画像を追加
+    for (const name in catImageMap) {
+      if (userQuestion.includes(name)) {
+        const imagePath = catImageMap[name];
+        if (fs.existsSync(imagePath)) { // ファイルの存在確認
+          const imageMimeType = getMimeType(imagePath);
+          promptParts.push(fileToGenerativePart(imagePath, imageMimeType));
+          // 複数の猫の名前に対応する場合はこのbreakを外しますが、
+          // シンプルにするため最初に見つかった猫の画像だけを追加します。
+          break; 
+        }
+      }
+    }
+
+    // ★ 最後にユーザーの質問を追加
+    promptParts.push(userQuestion);
 
     // ストリーミング形式でAIにリクエスト
     const result = await model.generateContentStream(promptParts); // ★ 変更後のパーツを渡す
