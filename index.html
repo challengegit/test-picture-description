@@ -30,18 +30,29 @@
           border-radius: 8px;
           box-shadow: 0 4px 8px rgba(0,0,0,0.1);
       }
-      #play-button {
-        display: none;
+      /* ★★★★★★★★★★★★★★★★★★★★★★★★ */
+      /* ★ 音声コントロールボタン用のCSSを追加/変更 ★ */
+      /* ★★★★★★★★★★★★★★★★★★★★★★★★ */
+      #audio-controls {
+        display: none; /* 最初は隠しておく */
         margin-top: 15px;
+        display: flex; /* ボタンを横並びにする */
+        gap: 10px; /* ボタンの間に隙間を設ける */
+      }
+      #play-pause-button, #stop-button {
         padding: 8px 16px;
-        background-color: #28a745;
-        color: white;
         border: none;
         border-radius: 4px;
         cursor: pointer;
         font-weight: bold;
+        color: white;
+        font-size: 14px;
       }
-      #play-button:hover { background-color: #218838; }
+      #play-pause-button { background-color: #28a745; } /* 緑色 */
+      #play-pause-button:hover { background-color: #218838; }
+      #stop-button { background-color: #dc3545; } /* 赤色 */
+      #stop-button:hover { background-color: #c82333; }
+      
       @media (max-width: 768px) {
         html, body { overflow: auto; }
         .main-container { flex-direction: column; height: auto; }
@@ -71,7 +82,13 @@
             <div id="answer-container">
                 <h3>答え：</h3>
                 <p id="answer-area">ここに答えが表示されます</p>
-                <button id="play-button">この答えを読み上げる ▶</button>
+                <!-- ★★★★★★★★★★★★★★★★★★★★★★ -->
+                <!-- ★ 音声コントロールボタンのHTMLを変更 ★ -->
+                <!-- ★★★★★★★★★★★★★★★★★★★★★★ -->
+                <div id="audio-controls">
+                    <button id="play-pause-button">再生 ▶</button>
+                    <button id="stop-button">停止 ⏹</button>
+                </div>
             </div>
         </div>
     </div>
@@ -81,11 +98,17 @@
         const questionInput = document.getElementById('question-input');
         const askButton = document.getElementById('ask-button');
         const answerArea = document.getElementById('answer-area');
-        const playButton = document.getElementById('play-button');
+        // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+        // ★ 音声コントロール用の要素をまとめて取得            ★
+        // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+        const audioControls = document.getElementById('audio-controls');
+        const playPauseButton = document.getElementById('play-pause-button');
+        const stopButton = document.getElementById('stop-button');
 
         askButton.addEventListener('click', async function() {
+          // 質問時に現在の読み上げをキャンセルし、ボタンを隠す
           speechSynthesis.cancel();
-          playButton.style.display = 'none';
+          audioControls.style.display = 'none';
 
           const userQuestion = questionInput.value;
           if (!userQuestion) {
@@ -115,8 +138,10 @@
             while (true) {
               const { value, done } = await reader.read();
               if (done) {
+                // 回答生成完了後、エラーでなければコントロールボタンを表示
                 if (answerArea.textContent && !answerArea.textContent.includes('エラー')) {
-                  playButton.style.display = 'block';
+                  audioControls.style.display = 'flex';
+                  playPauseButton.textContent = '再生 ▶';
                 }
                 break;
               }
@@ -135,15 +160,48 @@
           }
         });
 
-        playButton.addEventListener('click', function() {
-          const textToRead = answerArea.textContent;
-          if (textToRead && !speechSynthesis.speaking) {
-            const utterance = new SpeechSynthesisUtterance(textToRead);
-            utterance.lang = 'ja-JP';
-            utterance.pitch = 1.3;
-            utterance.rate = 1.1;
-            speechSynthesis.speak(utterance);
+        // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+        // ★ ここからが、新しい音声コントロールのロジックです               ★
+        // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+
+        // 再生/一時停止ボタンの処理
+        playPauseButton.addEventListener('click', function() {
+          if (!answerArea.textContent) return; // 読み上げるテキストがなければ何もしない
+
+          // 1. 読み上げ中で、かつ、一時停止中でない場合 → 一時停止する
+          if (speechSynthesis.speaking && !speechSynthesis.paused) {
+            speechSynthesis.pause();
+            return;
           }
+          
+          // 2. 一時停止中の場合 → 再開する
+          if (speechSynthesis.paused) {
+            speechSynthesis.resume();
+            return;
+          }
+
+          // 3. 停止している場合 → 最初から再生する
+          speechSynthesis.cancel(); // 念のためキューをクリア
+          const utterance = new SpeechSynthesisUtterance(answerArea.textContent);
+          utterance.lang = 'ja-JP';
+          utterance.pitch = 1.3;
+          utterance.rate = 1.1;
+
+          // 読み上げの状態に応じてボタンの表示を自動で切り替える
+          utterance.onstart = () => { playPauseButton.textContent = '一時停止 ⏸'; };
+          utterance.onpause = () => { playPauseButton.textContent = '再開 ▶'; };
+          utterance.onresume = () => { playPauseButton.textContent = '一時停止 ⏸'; };
+          utterance.onend = () => { playPauseButton.textContent = '再生 ▶'; };
+
+          speechSynthesis.speak(utterance);
+        });
+
+        // 停止ボタンの処理
+        stopButton.addEventListener('click', function() {
+          // 読み上げを完全にキャンセル（停止）する
+          speechSynthesis.cancel();
+          // 再生ボタンの表示を初期状態に戻す
+          playPauseButton.textContent = '再生 ▶';
         });
 
         questionInput.addEventListener('keydown', function(event) {
