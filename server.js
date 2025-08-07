@@ -8,8 +8,16 @@ const path = require('path');
 const app = express();
 app.use(express.json()); // JSON形式のリクエストを扱えるようにする
 
-// フロントエンド（index.htmlや画像など）のファイルを提供するための設定
+// フロントエンド（画像やCSSなど）のファイルを提供するための設定
 app.use(express.static('.'));
+
+// ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+// ★ ここが今回の修正点です！                                      ★
+// ★ トップページにアクセスがあったら、index.htmlを返すように命令します ★
+// ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 // GitHub SecretsからAPIキーを読み込む
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -63,11 +71,7 @@ app.post('/ask', async (req, res) => {
     if (!userQuestion) {
       return res.status(400).json({ error: '質問がありません。' });
     }
-
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-    // ★ ここからが、ロールプレイ機能を実装するための変更点です ★
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-
+    
     // ユーザーの質問から猫の名前を特定する
     let targetCatName = null;
     let targetImagePart = null;
@@ -140,7 +144,7 @@ app.post('/ask', async (req, res) => {
   }
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000; // Renderが指定するポートに対応
 app.listen(PORT, () => {
-  console.log(`サーバーがポート${PORT}で起動しました。 http://localhost:${PORT}`);
+  console.log(`サーバーがポート${PORT}で起動しました。`);
 });
