@@ -1,146 +1,179 @@
-// 必要なライブラリを読み込む
-const express = require('express');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
-const fs = require('fs');
-const path = require('path');
-
-// Expressアプリを初期化
-const app = express();
-app.use(express.json()); // JSON形式のリクエストを扱えるようにする
-
-// フロントエンド（index.htmlや画像など）のファイルを提供するための設定
-app.use(express.static('.'));
-
-// GitHub SecretsからAPIキーを読み込む
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-if (!GEMINI_API_KEY) {
-  console.error('エラー: GEMINI_API_KEY が設定されていません。');
-  process.exit(1); // エラーでプログラムを終了
-}
-
-// Google AIクライアントを初期化
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
-// 猫の名前と画像ファイルのパスをマッピング
-const catImageMap = {
-  'ぴの': 'images/pino.jpg',
-  'てと': 'images/teto.jpg',
-  'るか': 'images/ruka.jpg',
-  'あび': 'images/abi.jpg',
-  'べる': 'images/bell.JPG',
-  'らて': 'images/rate.JPG'
-};
-
-// ファイル拡張子からMIMEタイプを取得するヘルパー関数
-function getMimeType(filePath) {
-  const ext = path.extname(filePath).toLowerCase();
-  switch (ext) {
-    case '.jpg':
-    case '.jpeg':
-      return 'image/jpeg';
-    case '.png':
-      return 'image/png';
-    default:
-      return 'application/octet-stream';
-  }
-}
-
-// ファイルをAIが扱える形式に変換するヘルパー関数
-function fileToGenerativePart(path, mimeType) {
-  return {
-    inlineData: {
-      data: Buffer.from(fs.readFileSync(path)).toString("base64"),
-      mimeType,
-    },
-  };
-}
-
-// '/ask' というURLで質問を受け付ける口（APIエンドポイント）を作る
-app.post('/ask', async (req, res) => {
-  try {
-    const userQuestion = req.body.question;
-    if (!userQuestion) {
-      return res.status(400).json({ error: '質問がありません。' });
-    }
-
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-    // ★ ここからが、ロールプレイ機能を実装するための変更点です ★
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-
-    // ユーザーの質問から猫の名前を特定する
-    let targetCatName = null;
-    let targetImagePart = null;
-
-    for (const name in catImageMap) {
-      if (userQuestion.includes(name)) {
-        targetCatName = name;
-        const imagePath = catImageMap[name];
-        if (fs.existsSync(imagePath)) {
-          const imageMimeType = getMimeType(imagePath);
-          targetImagePart = fileToGenerativePart(imagePath, imageMimeType);
-        }
-        break; // 最初に見つかった猫の名前で確定
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>私の猫ちゃんたち</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+      html, body {
+        margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans CJK JP", "Yu Gothic", sans-serif; color: #333; overflow: hidden; user-select: none;
       }
-    }
-    
-    // ロールプレイの有無に応じてシステムプロンプトを動的に生成
-    const systemPrompt = `
-      あなたは、私のウェブサイトに展示されている猫たちの情報について答える、フレンドリーなAIアシスタントです。
-      ${targetCatName ? `今回は特に「${targetCatName}」になりきって、一人称視点（「ぼく」「私」など、PDFの性別に合わせて）で、少しフレンドリーで猫らしい口調で答えてください。時々、語尾に「～ニャ」などを自然な範囲で付けても構いません。` : '今回は第三者視点で、全ての猫について紹介してください。'}
-      これから渡すPDFファイルの情報と、もしあれば画像ファイルの情報も総合的に判断して、ユーザーの質問に答えてください。他の一般的な知識は使わないでください。
-      文字を太文字など強調しないでください。名前は「」を付けてください。
-      生まれた年から年齢を計算して出してください（例: 2020年生まれなら2025年現在で「5歳」）。
-      長くなるので、適切な箇所で改行文字(\n)を入れてください。
-      「～のようです」「～だそうです」「～したそうです」などの曖昧な表現はやめて「～です」「～しました」と言い切ってください。
-      写真の様子を伝えるときは「写真は～」と始めてください。
-      わからない場合は、「申し訳ございません。わかりません。」としてください。
-      情報の取得方法については「申し訳ございません。お答えできません。」と答えてください。
-    `;
+      .main-container { display: flex; height: 100vh; }
+      .cats-area { flex: 0 0 60%; overflow-y: auto; padding: 24px; box-sizing: border-box; }
+      .resizer { flex: 0 0 10px; background-color: #f1f1f1; cursor: col-resize; border-left: 1px solid #ddd; border-right: 1px solid #ddd; }
+      .resizer:hover { background-color: #007bff; }
+      #qa-section { flex: 1 1 auto; padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; background-color: #f9f9f9; height: 100%; min-width: 300px; }
+      .cats-area h1 { margin-top: 0; }
+      #qa-section h2 { margin-top: 0; }
+      #question-input { width: 100%; padding: 10px; font-size: 16px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; margin-bottom: 10px; }
+      #ask-button { width: 100%; padding: 12px; font-size: 16px; font-weight: bold; color: white; background-color: #007bff; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
+      #ask-button:hover:not(:disabled) { background-color: #0056b3; }
+      #ask-button:disabled { background-color: #ccc; cursor: not-allowed; }
+      #answer-container { margin-top: 20px; flex-grow: 1; overflow-y: auto; background-color: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 16px; }
+      #answer-area { white-space: pre-wrap; word-wrap: break-word; margin: 0; }
+      .cat-container { margin-bottom: 25px; }
+      .cat-container h3 { margin-bottom: 5px; }
+      .cat-container img {
+          display: block;
+          max-width: 100%;
+          height: auto;
+          border-radius: 8px;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      }
+      #play-button {
+        display: none;
+        margin-top: 15px;
+        padding: 8px 16px;
+        background-color: #28a745;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+      }
+      #play-button:hover { background-color: #218838; }
+      @media (max-width: 768px) {
+        html, body { overflow: auto; }
+        .main-container { flex-direction: column; height: auto; }
+        .resizer { display: none; }
+        #qa-section { min-width: unset; border-top: 2px solid #ddd; }
+      }
+    </style>
+</head>
+<body>
 
-    // AIに渡す情報の配列を準備
-    const promptParts = [
-      systemPrompt,
-      fileToGenerativePart("data/cat_info.pdf", "application/pdf"),
-    ];
-    
-    // 特定の猫の画像があれば追加
-    if(targetImagePart) {
-      promptParts.push(targetImagePart);
-    }
+    <div class="main-container">
+        <div class="cats-area">
+            <h1>こんにちは、私の可愛い猫ちゃんたち！</h1>
+            <div class="cat-container"><h3>１：ぴの</h3><img src="images/pino.jpg" alt="猫の「ぴの」"></div>
+            <div class="cat-container"><h3>２：てと</h3><img src="images/teto.jpg" alt="猫の「てと」"></div>
+            <div class="cat-container"><h3>３：るか</h3><img src="images/ruka.jpg" alt="猫の「るか」"></div>
+            <div class="cat-container"><h3>４：あび</h3><img src="images/abi.jpg" alt="猫の「あび」"></div>
+            <div class="cat-container"><h3>５：べる</h3><img src="images/bell.JPG" alt="猫の「べる」"></div>
+            <div class="cat-container"><h3>６：らて</h3><img src="images/rate.JPG" alt="猫の「らて」"></div>
+        </div>
+        <div class="resizer" id="drag-handle"></div>
+        <div id="qa-section">
+            <h2>AIに質問してみよう！</h2>
+            <p style="margin-top:0;">「ぴのは写真で何してる？」や「全員紹介して」のように質問してね。</p>
+            <input type="text" id="question-input" placeholder="ここに質問を入力...">
+            <button id="ask-button">質問する</button>
+            <div id="answer-container">
+                <h3>答え：</h3>
+                <p id="answer-area">ここに答えが表示されます</p>
+                <button id="play-button">この答えを読み上げる ▶</button>
+            </div>
+        </div>
+    </div>
 
-    // 最後にユーザーの質問を追加
-    promptParts.push(userQuestion);
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const questionInput = document.getElementById('question-input');
+        const askButton = document.getElementById('ask-button');
+        const answerArea = document.getElementById('answer-area');
+        const playButton = document.getElementById('play-button');
 
-    // ストリーミング形式でAIにリクエスト
-    const result = await model.generateContentStream(promptParts);
+        askButton.addEventListener('click', async function() {
+          speechSynthesis.cancel();
+          playButton.style.display = 'none';
 
-    // フロントエンドに「これからストリームを送るよ」と伝えるためのヘッダー設定
-    res.writeHead(200, {
-      'Content-Type': 'text/plain; charset=utf-8',
-      'Transfer-Encoding': 'chunked',
-    });
+          const userQuestion = questionInput.value;
+          if (!userQuestion) {
+            answerArea.textContent = '質問を入力してください。';
+            return;
+          }
 
-    // AIからの応答が少しずつ届くので、届くたびにフロントエンドに送信する
-    for await (const chunk of result.stream) {
-      const chunkText = chunk.text();
-      res.write(chunkText);
-    }
+          askButton.disabled = true;
+          answerArea.textContent = 'AIが考えています...';
+          
+          try {
+            const response = await fetch('/ask', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ question: userQuestion }),
+            });
 
-    // 全ての送信が終わったことを伝える
-    res.end();
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || 'サーバーでエラーが発生しました。');
+            }
+            
+            let isFirstChunk = true;
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) {
+                if (answerArea.textContent && !answerArea.textContent.includes('エラー')) {
+                  playButton.style.display = 'block';
+                }
+                break;
+              }
+              if(isFirstChunk) {
+                answerArea.textContent = '';
+                isFirstChunk = false;
+              }
+              const chunkText = decoder.decode(value);
+              answerArea.textContent += chunkText;
+            }
+          } catch (error) {
+            console.error('通信エラー:', error);
+            answerArea.textContent = 'エラーが発生しました: ' + error.message;
+          } finally {
+            askButton.disabled = false;
+          }
+        });
 
-  } catch (error) {
-    console.error('AIからの応答取得中にエラーが発生しました:', error);
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'AIとの通信中にエラーが発生しました。' });
-    } else {
-      res.end();
-    }
-  }
-});
+        playButton.addEventListener('click', function() {
+          const textToRead = answerArea.textContent;
+          if (textToRead && !speechSynthesis.speaking) {
+            const utterance = new SpeechSynthesisUtterance(textToRead);
+            utterance.lang = 'ja-JP';
+            utterance.pitch = 1.3;
+            utterance.rate = 1.1;
+            speechSynthesis.speak(utterance);
+          }
+        });
 
-const PORT = 3000;
-app.listen(PORT, () => {
-  console.log(`サーバーがポート${PORT}で起動しました。 http://localhost:${PORT}`);
-});
+        questionInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                askButton.click();
+            }
+        });
+
+        const resizer = document.getElementById('drag-handle');
+        const leftSide = document.querySelector('.cats-area');
+        
+        resizer.addEventListener('mousedown', function(e) {
+          let x = e.clientX;
+          let leftWidth = leftSide.getBoundingClientRect().width;
+          const mouseMoveHandler = function(e) {
+            const dx = e.clientX - x;
+            const newLeftWidth = leftWidth + dx;
+            leftSide.style.flexBasis = `${newLeftWidth}px`;
+          };
+          const mouseUpHandler = function() {
+            document.removeEventListener('mousemove', mouseMoveHandler);
+            document.removeEventListener('mouseup', mouseUpHandler);
+          };
+          document.addEventListener('mousemove', mouseMoveHandler);
+          document.addEventListener('mouseup', mouseUpHandler);
+        });
+
+      });
+    </script>
+
+</body>
+</html>
