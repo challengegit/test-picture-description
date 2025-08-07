@@ -2,7 +2,7 @@
 const express = require('express');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const fs = require('fs');
-const path = require('path'); // ★ ファイルパスを扱うために追加
+const path = require('path');
 
 // Expressアプリを初期化
 const app = express();
@@ -21,10 +21,6 @@ if (!GEMINI_API_KEY) {
 // Google AIクライアントを初期化
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
-// ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-// ★ ここからが、画像認識(Vision)を扱うための変更点です ★
-// ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
 
 // 猫の名前と画像ファイルのパスをマッピング
 const catImageMap = {
@@ -45,13 +41,12 @@ function getMimeType(filePath) {
       return 'image/jpeg';
     case '.png':
       return 'image/png';
-    // 他の画像形式が必要な場合はここに追加
     default:
       return 'application/octet-stream';
   }
 }
 
-// ファイルをAIが扱える形式に変換するヘルパー関数 (変更なし)
+// ファイルをAIが扱える形式に変換するヘルパー関数
 function fileToGenerativePart(path, mimeType) {
   return {
     inlineData: {
@@ -69,9 +64,30 @@ app.post('/ask', async (req, res) => {
       return res.status(400).json({ error: '質問がありません。' });
     }
 
-    // ★ プロンプトを画像認識用に修正
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+    // ★ ここからが、ロールプレイ機能を実装するための変更点です ★
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+
+    // ユーザーの質問から猫の名前を特定する
+    let targetCatName = null;
+    let targetImagePart = null;
+
+    for (const name in catImageMap) {
+      if (userQuestion.includes(name)) {
+        targetCatName = name;
+        const imagePath = catImageMap[name];
+        if (fs.existsSync(imagePath)) {
+          const imageMimeType = getMimeType(imagePath);
+          targetImagePart = fileToGenerativePart(imagePath, imageMimeType);
+        }
+        break; // 最初に見つかった猫の名前で確定
+      }
+    }
+    
+    // ロールプレイの有無に応じてシステムプロンプトを動的に生成
     const systemPrompt = `
       あなたは、私のウェブサイトに展示されている猫たちの情報について答える、フレンドリーなAIアシスタントです。
+      ${targetCatName ? `今回は特に「${targetCatName}」になりきって、一人称視点（「ぼく」「私」など、PDFの性別に合わせて）で、少しフレンドリーで猫らしい口調で答えてください。時々、語尾に「～ニャ」などを自然な範囲で付けても構いません。` : '今回は第三者視点で、全ての猫について紹介してください。'}
       これから渡すPDFファイルの情報と、もしあれば画像ファイルの情報も総合的に判断して、ユーザーの質問に答えてください。他の一般的な知識は使わないでください。
       文字を太文字など強調しないでください。名前は「」を付けてください。
       生まれた年から年齢を計算して出してください（例: 2020年生まれなら2025年現在で「5歳」）。
@@ -82,32 +98,22 @@ app.post('/ask', async (req, res) => {
       情報の取得方法については「申し訳ございません。お答えできません。」と答えてください。
     `;
 
-    // ★ AIに渡す情報の配列を準備
+    // AIに渡す情報の配列を準備
     const promptParts = [
       systemPrompt,
-      // PDFファイルは常に含める
       fileToGenerativePart("data/cat_info.pdf", "application/pdf"),
     ];
-
-    // ★ ユーザーの質問に猫の名前が含まれているかチェックし、あれば画像を追加
-    for (const name in catImageMap) {
-      if (userQuestion.includes(name)) {
-        const imagePath = catImageMap[name];
-        if (fs.existsSync(imagePath)) { // ファイルの存在確認
-          const imageMimeType = getMimeType(imagePath);
-          promptParts.push(fileToGenerativePart(imagePath, imageMimeType));
-          // 複数の猫の名前に対応する場合はこのbreakを外しますが、
-          // シンプルにするため最初に見つかった猫の画像だけを追加します。
-          break; 
-        }
-      }
+    
+    // 特定の猫の画像があれば追加
+    if(targetImagePart) {
+      promptParts.push(targetImagePart);
     }
 
-    // ★ 最後にユーザーの質問を追加
+    // 最後にユーザーの質問を追加
     promptParts.push(userQuestion);
 
     // ストリーミング形式でAIにリクエスト
-    const result = await model.generateContentStream(promptParts); // ★ 変更後のパーツを渡す
+    const result = await model.generateContentStream(promptParts);
 
     // フロントエンドに「これからストリームを送るよ」と伝えるためのヘッダー設定
     res.writeHead(200, {
