@@ -25,6 +25,7 @@ if (!GEMINI_API_KEY) {
 
 // Google AIクライアントの初期化
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
 // 猫の名前と画像ファイルのパスをマッピング（絶対パスで解決するように）
 const catImageMap = {
@@ -81,77 +82,52 @@ app.post('/ask', async (req, res) => {
       }
     }
     
+    // ★★★ シンプルなテキスト生成用のプロンプトに変更 ★★★
     const systemPrompt = `
-      あなたはユーザーの質問に対し、必ずJSON形式で回答を生成するAIです。
-      あなたの出力は、説明文などを一切含まず、JSONオブジェクトそのものでなければなりません。
-
-      ## JSONフォーマット
-      {
-        "displayText": "表示用のテキスト",
-        "speechText": "音声読み上げ用のひらがなテキスト"
-      }
-
-      ## displayTextのルール
-      - ${targetCatName ? `「${targetCatName}」になりきり、一人称（ぼく、私など）でフレンドリーな猫の口調で記述する。` : '第三者視点で、全ての猫について紹介する。'}
-      - 「～です」「～ます」といった断定表現のみを使用する。「～のようです」「～だそうです」は禁止。
-      - 適切な箇所で改行文字(\\n)を入れる。
-      - 猫の名前は「」で囲む。
-      - 生まれた年から現在の年齢を計算して含める。
-      - 写真について言及する場合は「写真は～」から始める。
-
-      ## speechTextのルール
-      - displayTextと全く同じ内容を、すべてひらがなにする。
-      - 漢字、カタカナ、アルファベット、数字は使用禁止。
-      - 句読点（、。）と「」のみ使用を許可する。
-      - 「愛称」の読みは「あいしょう」とする。
-      
-      ## その他のルール
-      - 提供されたPDFと画像の情報を元に回答する。一般的な知識は使わない。
-      - 不明な点は、両方のテキストに「申し訳ございません。わかりません。」と入れる。
-      
-      以上のルールを絶対に守り、JSONオブジェクトのみを出力してください。
+      あなたは、私のウェブサイトに展示されている猫たちの情報について答える、フレンドリーなAIアシスタントです。
+      ${targetCatName ? `今回は特に「${targetCatName}」になりきって、一人称視点（「ぼく」「私」など、PDFの性別に合わせて）で、少しフレンドリーで猫らしい口調で答えてください。時々、語尾に「～ニャ」などを自然な範囲で付けても構いません。` : '今回は第三者視点で、全ての猫について紹介してください。'}
+      これから渡すPDFファイルの情報と、もしあれば画像ファイルの情報も総合的に判断して、ユーザーの質問に答えてください。他の一般的な知識は使わないでください。
+      文字を太文字など強調しないでください。愛称はPDFの情報を使ってください。名前は「」を付けてください。
+      生まれた年から年齢を計算して出してください（例: 2020年生まれなら2025年現在で「5歳」）。
+      長くなるので、適切な箇所で改行文字(\\n)を入れてください。
+      「～のようです」「～だそうです」「～したそうです」などの曖昧な表現はやめて「～です」「～しました」と言い切ってください。
+      写真の様子を伝えるときは「写真は～」と始めてください。
+      わからない場合は、「申し訳ございません。わかりません。」としてください。
+      情報の取得方法については「申し訳ございません。お答えできません。」と答えてください。
     `;
 
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-    // ★ ここが全ての解決策です。APIの公式仕様に完全に準拠します。 ★
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-
-    // 1. モデルの初期化はシンプルに行う
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
-    });
-
-    // 2. AIに渡すパーツの配列を作成する
     const promptParts = [
-      // 3. 全てのテキストデータを `{ text: "..." }` 形式で正しくラップする
-      { text: systemPrompt }, 
+      systemPrompt,
       fileToGenerativePart(pdfPath, "application/pdf"),
     ];
-    if (targetImagePart) {
+    
+    if(targetImagePart) {
       promptParts.push(targetImagePart);
     }
-    // 4. ユーザーの質問も正しくラップする
-    promptParts.push({ text: userQuestion });
+    promptParts.push(userQuestion);
 
-    // 5. 応答を生成する（JSONモードの特殊な設定は使わない）
-    const result = await model.generateContent(promptParts);
-    const rawResponseText = result.response.text();
-    
-    // 6. AIが生成したテキストの中から、JSON部分だけを抜き出す
-    const jsonMatch = rawResponseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error("AIからのレスポンスにJSONが見つかりませんでした:", rawResponseText);
-      throw new Error("AIが予期せぬ形式で応答しました。");
+    // ★★★ ストリーミングで回答を生成 ★★★
+    const result = await model.generateContentStream(promptParts);
+
+    res.writeHead(200, {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Transfer-Encoding': 'chunked',
+    });
+
+    // ★★★ 生成されたテキストをそのままクライアントに流す ★★★
+    for await (const chunk of result.stream) {
+      const chunkText = chunk.text();
+      res.write(chunkText);
     }
-    const jsonString = jsonMatch[0];
-
-    // 7. 抜き出したJSONをクライアントに送る
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.send(jsonString);
+    res.end();
 
   } catch (error) {
     console.error('[/ask] 処理中にエラーが発生しました:', error);
-    res.status(500).json({ error: 'AIとの通信中にエラーが発生しました。詳細はサーバーログを確認してください。' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'AIとの通信中にエラーが発生しました。' });
+    } else {
+      res.end();
+    }
   }
 });
 

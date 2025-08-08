@@ -19,26 +19,22 @@
       #ask-button { width: 100%; padding: 12px; font-size: 16px; font-weight: bold; color: white; background-color: #007bff; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.2s; }
       #ask-button:hover:not(:disabled) { background-color: #0056b3; }
       #ask-button:disabled { background-color: #ccc; cursor: not-allowed; }
-      #answer-container { position: relative; margin-top: 20px; flex-grow: 1; overflow-y: auto; background-color: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 16px; }
+      #answer-container { margin-top: 20px; flex-grow: 1; overflow-y: auto; background-color: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 16px; }
       #answer-area { white-space: pre-wrap; word-wrap: break-word; margin: 0; }
       .cat-container { margin-bottom: 25px; }
       .cat-container h3 { margin-bottom: 5px; }
-      .cat-container img { display: block; max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-      #audio-controls { display: none; margin-top: 15px; display: flex; gap: 10px; }
-      #play-pause-button, #stop-button { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; font-size: 14px; }
-      #play-pause-button { background-color: #28a745; }
-      #play-pause-button:hover { background-color: #218838; }
-      #stop-button { background-color: #dc3545; }
-      #stop-button:hover { background-color: #c82333; }
-      
-      /* ★★★ ローディングアニメーション用のCSS ★★★ */
-      .loader-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.8); display: none; justify-content: center; align-items: center; z-index: 10; }
-      .loader { border: 5px solid #f3f3f3; border-radius: 50%; border-top: 5px solid #3498db; width: 50px; height: 50px; -webkit-animation: spin 1s linear infinite; animation: spin 1s linear infinite; }
-      @-webkit-keyframes spin { 0% { -webkit-transform: rotate(0deg); } 100% { -webkit-transform: rotate(360deg); } }
-      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
+      .cat-container img {
+          display: block;
+          max-width: 100%;
+          height: auto;
+          border-radius: 8px;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      }
       @media (max-width: 768px) {
-        html, body { overflow: auto; } .main-container { flex-direction: column; height: auto; } .resizer { display: none; } #qa-section { min-width: unset; border-top: 2px solid #ddd; }
+        html, body { overflow: auto; }
+        .main-container { flex-direction: column; height: auto; }
+        .resizer { display: none; }
+        #qa-section { min-width: unset; border-top: 2px solid #ddd; }
       }
     </style>
 </head>
@@ -61,14 +57,9 @@
             <input type="text" id="question-input" placeholder="ここに質問を入力...">
             <button id="ask-button">質問する</button>
             <div id="answer-container">
-                <!-- ★★★ ローディングアニメーションの要素を追加 ★★★ -->
-                <div class="loader-overlay"><div class="loader"></div></div>
                 <h3>答え：</h3>
                 <p id="answer-area">ここに答えが表示されます</p>
-                <div id="audio-controls">
-                    <button id="play-pause-button">再生 ▶</button>
-                    <button id="stop-button">停止 ⏹</button>
-                </div>
+                <!-- ★★★ 音声再生ボタンを削除 ★★★ -->
             </div>
         </div>
     </div>
@@ -78,18 +69,9 @@
         const questionInput = document.getElementById('question-input');
         const askButton = document.getElementById('ask-button');
         const answerArea = document.getElementById('answer-area');
-        const audioControls = document.getElementById('audio-controls');
-        const playPauseButton = document.getElementById('play-pause-button');
-        const stopButton = document.getElementById('stop-button');
-        const loader = document.querySelector('.loader-overlay'); // ★ローダーを取得
 
-        let currentAiResponse = null;
-
+        // ★★★ ストリーミング表示のためのシンプルなスクリプト ★★★
         askButton.addEventListener('click', async function() {
-          speechSynthesis.cancel();
-          audioControls.style.display = 'none';
-          currentAiResponse = null;
-
           const userQuestion = questionInput.value;
           if (!userQuestion) {
             answerArea.textContent = '質問を入力してください。';
@@ -97,8 +79,7 @@
           }
 
           askButton.disabled = true;
-          answerArea.textContent = ''; // 回答エリアをクリア
-          loader.style.display = 'flex'; // ★ローダーを表示
+          answerArea.textContent = 'AIが考えています...';
           
           try {
             const response = await fetch('/ask', {
@@ -108,67 +89,31 @@
             });
 
             if (!response.ok) {
-              const errorData = await response.json().catch(() => ({ error: 'サーバーで不明なエラーが発生しました。' }));
+              const errorData = await response.json();
               throw new Error(errorData.error || 'サーバーでエラーが発生しました。');
             }
             
-            const data = await response.json();
-            currentAiResponse = data;
-
-            answerArea.textContent = currentAiResponse.displayText;
-
-            if (currentAiResponse.speechText && !currentAiResponse.displayText.includes('エラー')) {
-                audioControls.style.display = 'flex';
-                playPauseButton.textContent = '再生 ▶';
+            let isFirstChunk = true;
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              
+              if(isFirstChunk) {
+                answerArea.textContent = '';
+                isFirstChunk = false;
+              }
+              const chunkText = decoder.decode(value, { stream: true });
+              answerArea.textContent += chunkText;
             }
-
           } catch (error) {
             console.error('通信エラー:', error);
-            // ★ try-catch-finallyブロック内で、エラー時のテキスト表示を行う
             answerArea.textContent = 'エラーが発生しました: ' + error.message;
           } finally {
             askButton.disabled = false;
-            loader.style.display = 'none'; // ★ローダーを非表示
           }
-        });
-
-        let japaneseVoices = [];
-        function loadVoices() {
-            japaneseVoices = speechSynthesis.getVoices().filter(v => v.lang === 'ja-JP');
-        }
-        loadVoices();
-        if (speechSynthesis.onvoiceschanged !== undefined) {
-            speechSynthesis.onvoiceschanged = loadVoices;
-        }
-
-        playPauseButton.addEventListener('click', function() {
-          if (!currentAiResponse || !currentAiResponse.speechText) return;
-
-          if (speechSynthesis.speaking && !speechSynthesis.paused) {
-            speechSynthesis.pause(); return;
-          }
-          if (speechSynthesis.paused) {
-            speechSynthesis.resume(); return;
-          }
-          speechSynthesis.cancel();
-          
-          const utterance = new SpeechSynthesisUtterance(currentAiResponse.speechText);
-          utterance.lang = 'ja-JP';
-          utterance.pitch = 1.6;
-          utterance.rate = 1.2;
-          if (japaneseVoices.length > 0) {
-            utterance.voice = japaneseVoices.find(v => v.name.includes('Google')) || japaneseVoices[0];
-          }
-          utterance.onstart = () => { playPauseButton.textContent = '一時停止 ⏸'; };
-          utterance.onpause = () => { playPauseButton.textContent = '再開 ▶'; };
-          utterance.onresume = () => { playPauseButton.textContent = '一時停止 ⏸'; };
-          utterance.onend = () => { playPauseButton.textContent = '再生 ▶'; };
-          speechSynthesis.speak(utterance);
-        });
-
-        stopButton.addEventListener('click', function() {
-          speechSynthesis.cancel();
-          playPauseButton.textContent = '再生 ▶';
         });
 
         questionInput.addEventListener('keydown', function(event) {
@@ -196,6 +141,7 @@
           document.addEventListener('mousemove', mouseMoveHandler);
           document.addEventListener('mouseup', mouseUpHandler);
         });
+
       });
     </script>
 
