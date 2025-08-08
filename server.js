@@ -129,22 +129,41 @@ app.post('/ask', async (req, res) => {
     }
     promptParts.push(userQuestion);
 
-    const result = await model.generateContent({
-        contents: promptParts,
-        generationConfig: {
-            responseMimeType: "application/json",
-        },
-    });
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+    // ★ ここからが、AIの失敗を許容する頑丈な処理です ★
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
 
-    const responseText = result.response.text();
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.send(responseText);
+    // 1. responseMimeTypeを指定せず、プレーンテキストとしてレスポンスを受け取る
+    const result = await model.generateContent({ contents: promptParts });
+    const rawResponseText = result.response.text();
+
+    // 2. 受け取ったテキストから、JSON部分だけを抜き出す
+    const jsonMatch = rawResponseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error("AIからのレスポンスにJSONが見つかりませんでした:", rawResponseText);
+      throw new Error("AIが予期せぬ形式で応答しました。");
+    }
+    const jsonString = jsonMatch[0];
+
+    // 3. 抜き出したJSON文字列をクライアントに送信する
+    //    念のため、ここでJSONとして正しいかチェックする
+    try {
+      JSON.parse(jsonString); // パースできるか試す
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.send(jsonString);
+    } catch (parseError) {
+      console.error("AIが生成したJSONのパースに失敗しました:", parseError, jsonString);
+      throw new Error("AIが不正な形式のJSONを生成しました。");
+    }
 
   } catch (error) {
-    console.error('[/ask] エラー発生:', error);
+    console.error('[/ask] 最終的なエラー発生:', error);
     res.status(500).json({ error: 'AIとの通信中にエラーが発生しました。' });
   }
 });
+
+// favicon.ico へのリクエストを無視する（コンソールの404エラー対策）
+app.get('/favicon.ico', (req, res) => res.status(204).send());
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
