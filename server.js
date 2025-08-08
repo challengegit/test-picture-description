@@ -119,25 +119,27 @@ app.post('/ask', async (req, res) => {
     // 1. モデルの初期化はシンプルに行う
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
-      // generationConfigはここで指定する
-      generationConfig: {
-        responseMimeType: "application/json",
-      },
     });
 
     // 2. AIに渡すパーツの配列を作成する
+    //    システムへの指示を、ユーザーの質問の「一部」として一番最初に渡す
     const promptParts = [
-      // 3. システムへの指示を、ユーザーの質問の「一部」として一番最初に渡す
-      { text: systemPrompt }, 
+      systemPrompt, 
       fileToGenerativePart(pdfPath, "application/pdf"),
     ];
     if (targetImagePart) {
       promptParts.push(targetImagePart);
     }
-    promptParts.push({ text: userQuestion });
+    promptParts.push(userQuestion);
 
-    // 4. パーツの配列をそのまま渡す
-    const result = await model.generateContent(promptParts);
+    // 3. 応答を生成する際に、JSONモードを指定する
+    const result = await model.generateContent({
+        contents: [{ role: "user", parts: promptParts }],
+        generationConfig: {
+            responseMimeType: "application/json",
+        },
+    });
+
     const responseText = result.response.text();
     
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
