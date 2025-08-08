@@ -114,7 +114,10 @@ app.post('/ask', async (req, res) => {
 
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
-      systemInstruction: systemInstruction,
+      systemInstruction: {
+        role: "user",
+        parts: [{ text: systemInstruction }],
+      },
     });
 
     const promptParts = [
@@ -123,19 +126,20 @@ app.post('/ask', async (req, res) => {
     if (targetImagePart) {
       promptParts.push(targetImagePart);
     }
-    promptParts.push(userQuestion);
+    promptParts.push({text: userQuestion}); // ユーザーの質問もtextオブジェクトにする
 
     // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-    // ★ ここが全ての解決策です。APIに「JSONで応答せよ」と公式に命令します。 ★
+    // ★ ここが全ての解決策です。APIの公式仕様に従ってリクエストを構築します。 ★
     // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
     const result = await model.generateContent({
-        contents: promptParts,
+        // 1. 複数の要素（ファイル、テキスト）は "parts" 配列にまとめる
+        contents: [{ role: "user", parts: promptParts }],
+        // 2. JSONモードの指定は "response_mime_type" (アンダースコア区切り)
         generationConfig: {
-            responseMimeType: "application/json",
+            response_mime_type: "application/json",
         },
     });
 
-    // APIがJSONを保証するので、複雑なテキスト解析は不要になります。
     const responseText = result.response.text();
     
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
