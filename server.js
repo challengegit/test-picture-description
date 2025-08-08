@@ -81,7 +81,7 @@ app.post('/ask', async (req, res) => {
       }
     }
     
-    const systemInstruction = `
+    const systemPrompt = `
       あなたはユーザーの質問に対し、必ずJSON形式で回答を生成するAIです。
       あなたの出力は、説明文などを一切含まず、JSONオブジェクトそのものでなければなりません。
 
@@ -112,39 +112,36 @@ app.post('/ask', async (req, res) => {
       以上のルールを絶対に守り、JSONオブジェクトのみを出力してください。
     `;
 
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+    // ★ ここが全ての解決策です。APIの公式仕様に完全に準拠します。 ★
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+
+    // 1. モデルの初期化はシンプルに行う
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
-      systemInstruction: {
-        role: "user",
-        parts: [{ text: systemInstruction }],
+      // generationConfigはここで指定する
+      generationConfig: {
+        responseMimeType: "application/json",
       },
     });
 
+    // 2. AIに渡すパーツの配列を作成する
     const promptParts = [
+      // 3. システムへの指示を、ユーザーの質問の「一部」として一番最初に渡す
+      { text: systemPrompt }, 
       fileToGenerativePart(pdfPath, "application/pdf"),
     ];
     if (targetImagePart) {
       promptParts.push(targetImagePart);
     }
-    promptParts.push({text: userQuestion}); // ユーザーの質問もtextオブジェクトにする
+    promptParts.push({ text: userQuestion });
 
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-    // ★ ここが全ての解決策です。APIの公式仕様に従ってリクエストを構築します。 ★
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-    const result = await model.generateContent({
-        // 1. 複数の要素（ファイル、テキスト）は "parts" 配列にまとめる
-        contents: [{ role: "user", parts: promptParts }],
-        // 2. JSONモードの指定は "response_mime_type" (アンダースコア区切り)
-        generationConfig: {
-            response_mime_type: "application/json",
-        },
-    });
-
+    // 4. パーツの配列をそのまま渡す
+    const result = await model.generateContent(promptParts);
     const responseText = result.response.text();
     
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.send(responseText);
-
 
   } catch (error) {
     console.error('[/ask] 処理中にエラーが発生しました:', error);
