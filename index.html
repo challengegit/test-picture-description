@@ -30,14 +30,11 @@
           border-radius: 8px;
           box-shadow: 0 4px 8px rgba(0,0,0,0.1);
       }
-      /* ★★★★★★★★★★★★★★★★★★★★★★★★ */
-      /* ★ 音声コントロールボタン用のCSSを追加/変更 ★ */
-      /* ★★★★★★★★★★★★★★★★★★★★★★★★ */
       #audio-controls {
-        display: none; /* 最初は隠しておく */
+        display: none;
         margin-top: 15px;
-        display: flex; /* ボタンを横並びにする */
-        gap: 10px; /* ボタンの間に隙間を設ける */
+        display: flex;
+        gap: 10px;
       }
       #play-pause-button, #stop-button {
         padding: 8px 16px;
@@ -48,9 +45,9 @@
         color: white;
         font-size: 14px;
       }
-      #play-pause-button { background-color: #28a745; } /* 緑色 */
+      #play-pause-button { background-color: #28a745; }
       #play-pause-button:hover { background-color: #218838; }
-      #stop-button { background-color: #dc3545; } /* 赤色 */
+      #stop-button { background-color: #dc3545; }
       #stop-button:hover { background-color: #c82333; }
       
       @media (max-width: 768px) {
@@ -82,9 +79,6 @@
             <div id="answer-container">
                 <h3>答え：</h3>
                 <p id="answer-area">ここに答えが表示されます</p>
-                <!-- ★★★★★★★★★★★★★★★★★★★★★★ -->
-                <!-- ★ 音声コントロールボタンのHTMLを変更 ★ -->
-                <!-- ★★★★★★★★★★★★★★★★★★★★★★ -->
                 <div id="audio-controls">
                     <button id="play-pause-button">再生 ▶</button>
                     <button id="stop-button">停止 ⏹</button>
@@ -98,15 +92,11 @@
         const questionInput = document.getElementById('question-input');
         const askButton = document.getElementById('ask-button');
         const answerArea = document.getElementById('answer-area');
-        // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-        // ★ 音声コントロール用の要素をまとめて取得            ★
-        // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
         const audioControls = document.getElementById('audio-controls');
         const playPauseButton = document.getElementById('play-pause-button');
         const stopButton = document.getElementById('stop-button');
 
         askButton.addEventListener('click', async function() {
-          // 質問時に現在の読み上げをキャンセルし、ボタンを隠す
           speechSynthesis.cancel();
           audioControls.style.display = 'none';
 
@@ -138,7 +128,6 @@
             while (true) {
               const { value, done } = await reader.read();
               if (done) {
-                // 回答生成完了後、エラーでなければコントロールボタンを表示
                 if (answerArea.textContent && !answerArea.textContent.includes('エラー')) {
                   audioControls.style.display = 'flex';
                   playPauseButton.textContent = '再生 ▶';
@@ -161,33 +150,55 @@
         });
 
         // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-        // ★ ここからが、新しい音声コントロールのロジックです               ★
+        // ★ ここからが、ふりがなと声質調整に対応した音声コントロールのロジックです ★
         // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+
+        // 利用可能な日本語の音声リストを保持する変数
+        let japaneseVoices = [];
+        function loadVoices() {
+            japaneseVoices = speechSynthesis.getVoices().filter(v => v.lang === 'ja-JP');
+        }
+        // ブラウザが音声リストを読み込んだ時にリストを更新する
+        loadVoices();
+        if (speechSynthesis.onvoiceschanged !== undefined) {
+            speechSynthesis.onvoiceschanged = loadVoices;
+        }
 
         // 再生/一時停止ボタンの処理
         playPauseButton.addEventListener('click', function() {
-          if (!answerArea.textContent) return; // 読み上げるテキストがなければ何もしない
+          if (!answerArea.textContent || answerArea.textContent.includes('エラー')) return;
 
-          // 1. 読み上げ中で、かつ、一時停止中でない場合 → 一時停止する
           if (speechSynthesis.speaking && !speechSynthesis.paused) {
             speechSynthesis.pause();
             return;
           }
           
-          // 2. 一時停止中の場合 → 再開する
           if (speechSynthesis.paused) {
             speechSynthesis.resume();
             return;
           }
 
-          // 3. 停止している場合 → 最初から再生する
-          speechSynthesis.cancel(); // 念のためキューをクリア
-          const utterance = new SpeechSynthesisUtterance(answerArea.textContent);
-          utterance.lang = 'ja-JP';
-          utterance.pitch = 1.3;
-          utterance.rate = 1.1;
+          speechSynthesis.cancel();
+          
+          const originalText = answerArea.textContent;
+          // 正規表現で「漢字(ふりがな)」の形式を「ふりがな」に置換し、音声再生用のテキストを作成
+          // 例: 「彼の尻尾(しっぽ)は長い」 -> 「彼のしっぽは長い」
+          const forSpeechText = originalText.replace(/([\u4e00-\u9faf々〇]+)\(([\u3040-\u309f]+)\)/g, '$2');
+          
+          const utterance = new SpeechSynthesisUtterance(forSpeechText);
 
-          // 読み上げの状態に応じてボタンの表示を自動で切り替える
+          // --- 声質を調整 ---
+          utterance.lang = 'ja-JP';
+          utterance.pitch = 1.6; // 声の高さを設定 (1.0が通常。1.5-2.0で高くなる)
+          utterance.rate = 1.2;  // 話す速度を設定 (1.0が通常。少し早口で元気な感じに)
+          
+          // 利用可能な日本語音声があれば、それを設定する（環境依存）
+          if (japaneseVoices.length > 0) {
+            // "Google" の名前が入っている声を優先的に使う（より自然な場合が多いため）
+            utterance.voice = japaneseVoices.find(v => v.name.includes('Google')) || japaneseVoices[0];
+          }
+          // --------------------
+
           utterance.onstart = () => { playPauseButton.textContent = '一時停止 ⏸'; };
           utterance.onpause = () => { playPauseButton.textContent = '再開 ▶'; };
           utterance.onresume = () => { playPauseButton.textContent = '一時停止 ⏸'; };
@@ -198,9 +209,7 @@
 
         // 停止ボタンの処理
         stopButton.addEventListener('click', function() {
-          // 読み上げを完全にキャンセル（停止）する
           speechSynthesis.cancel();
-          // 再生ボタンの表示を初期状態に戻す
           playPauseButton.textContent = '再生 ▶';
         });
 
@@ -229,7 +238,6 @@
           document.addEventListener('mousemove', mouseMoveHandler);
           document.addEventListener('mouseup', mouseUpHandler);
         });
-
       });
     </script>
 
