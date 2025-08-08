@@ -122,21 +122,23 @@ app.post('/ask', async (req, res) => {
     });
 
     // 2. AIに渡すパーツの配列を作成する
-    //    システムへの指示を、ユーザーの質問の「一部」として一番最初に渡す
     const promptParts = [
-      systemPrompt, 
+      // 3. 全てのテキストデータを `{ text: "..." }` 形式で正しくラップする
+      { text: systemPrompt }, 
       fileToGenerativePart(pdfPath, "application/pdf"),
     ];
     if (targetImagePart) {
       promptParts.push(targetImagePart);
     }
-    promptParts.push(userQuestion);
+    // 4. ユーザーの質問も正しくラップする
+    promptParts.push({ text: userQuestion });
 
-    // 3. 応答を生成する際に、JSONモードを指定する
+    // 5. 応答を生成する際に、正しいキー名でJSONモードを指定する
     const result = await model.generateContent({
         contents: [{ role: "user", parts: promptParts }],
         generationConfig: {
-            responseMimeType: "application/json",
+            // 6. 正しいキー名は "response_mime_type" (アンダースコア区切り)
+            response_mime_type: "application/json",
         },
     });
 
