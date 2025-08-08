@@ -62,9 +62,8 @@ function fileToGenerativePart(filePath, mimeType) {
 // '/ask' というURLで質問を受け付ける口（APIエンドポイント）を作る
 app.post('/ask', async (req, res) => {
   try {
-    // ★★★ フロントエンドから会話履歴(history)と新しい質問(question)を受け取る ★★★
-    const { history, question } = req.body;
-    if (!question) {
+    const userQuestion = req.body.question;
+    if (!userQuestion) {
       return res.status(400).json({ error: '質問がありません。' });
     }
     
@@ -72,7 +71,7 @@ app.post('/ask', async (req, res) => {
     let targetImagePart = null;
 
     for (const name in catImageMap) {
-      if (question.includes(name)) {
+      if (userQuestion.includes(name)) {
         targetCatName = name;
         const imagePath = catImageMap[name];
         if (fs.existsSync(imagePath)) {
@@ -89,32 +88,27 @@ app.post('/ask', async (req, res) => {
       これから渡すPDFファイルの情報と、もしあれば画像ファイルの情報も総合的に判断して、ユーザーの質問に答えてください。他の一般的な知識は使わないでください。
       文字を太文字など強調しないでください。愛称はPDFの情報を使ってください。名前は「」を付けてください。
       生まれた年から年齢を計算して出してください（例: 2020年生まれなら2025年現在で「5歳」）。
-      長くなる場合は、読みやすくなるように適切な箇所で改行してください。
+      // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+      // ★ ここが、ご指摘いただいた通り修正された正しい指示です ★
+      // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+      長くなる場合は、読みやすくなるように適切な箇所で改行（\n）してください。
       「～のようです」「～だそうです」「～したそうです」などの曖昧な表現はやめて「～です」「～しました」と言い切ってください。
       写真の様子を伝えるときは「写真は～」と始めてください。
       わからない場合は、「申し訳ございません。わかりません。」としてください。
       情報の取得方法については「申し訳ございません。お答えできません。」と答えてください。
     `;
+
+    const promptParts = [
+      systemPrompt,
+      fileToGenerativePart(pdfPath, "application/pdf"),
+    ];
     
-    // ★★★ チャットモードを開始 ★★★
-    const chat = model.startChat({
-        history: [
-            // システムプロンプトとPDF情報をチャットの初期設定として渡す
-            { role: "user", parts: [ { text: systemPrompt }, fileToGenerativePart(pdfPath, "application/pdf") ] },
-            { role: "model", parts: [ { text: "ニャンだか御用かにゃ？なんでも聞いてくださいニャ！" } ] },
-            // フロントエンドから送られてきた過去の会話履歴を追加
-            ...history 
-        ]
-    });
-    
-    // ユーザーの新しい質問に、画像情報があれば追加する
-    const messageParts = [{ text: question }];
-    if (targetImagePart) {
-        messageParts.push(targetImagePart);
+    if(targetImagePart) {
+      promptParts.push(targetImagePart);
     }
-    
-    // ★★★ 新しいメッセージをストリーミングで送信し、応答を待つ ★★★
-    const result = await chat.sendMessageStream(messageParts);
+    promptParts.push(userQuestion);
+
+    const result = await model.generateContentStream(promptParts);
 
     res.writeHead(200, {
       'Content-Type': 'text/plain; charset=utf-8',
