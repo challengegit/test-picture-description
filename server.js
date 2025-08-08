@@ -81,7 +81,7 @@ app.post('/ask', async (req, res) => {
       }
     }
     
-    const systemPrompt = `
+    const systemInstruction = `
       あなたはユーザーの質問に対し、必ずJSON形式で回答を生成するAIです。
       あなたの出力は、説明文などを一切含まず、JSONオブジェクトそのものでなければなりません。
 
@@ -116,29 +116,27 @@ app.post('/ask', async (req, res) => {
     // ★ ここが全ての解決策です。APIの公式仕様に完全に準拠します。 ★
     // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
 
-    // 1. モデルの初期化はシンプルに行う
+    // 1. モデルの初期化時に、システムへの指示を公式の方法で設定する
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
+      systemInstruction: systemInstruction,
     });
 
-    // 2. AIに渡すパーツの配列を作成する
-    const promptParts = [
-      // 3. 全てのテキストデータを `{ text: "..." }` 形式で正しくラップする
-      { text: systemPrompt }, 
+    // 2. ユーザーからの入力（ファイルや質問）だけをまとめた配列を作成する
+    const userParts = [
       fileToGenerativePart(pdfPath, "application/pdf"),
     ];
     if (targetImagePart) {
-      promptParts.push(targetImagePart);
+      userParts.push(targetImagePart);
     }
-    // 4. ユーザーの質問も正しくラップする
-    promptParts.push({ text: userQuestion });
+    userParts.push({ text: userQuestion }); // ユーザーの質問も正しくオブジェクトにする
 
-    // 5. 応答を生成する際に、正しいキー名でJSONモードを指定する
+    // 3. 応答を生成する際に、正しいキー名でJSONモードを指定する
     const result = await model.generateContent({
-        contents: [{ role: "user", parts: promptParts }],
+        contents: [{ role: "user", parts: userParts }],
         generationConfig: {
-            // 6. 正しいキー名は "response_mime_type" (アンダースコア区切り)
-            response_mime_type: "application/json",
+            // 4. 正しいキー名は "responseMimeType" (camelCase) です
+            responseMimeType: "application/json",
         },
     });
 
