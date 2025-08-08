@@ -23,7 +23,7 @@ if (!GEMINI_API_KEY) {
   process.exit(1);
 }
 
-// ★ Google AIクライアントの初期化はここで行う
+// Google AIクライアントの初期化
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 // 猫の名前と画像ファイルのパスをマッピング（絶対パスで解決するように）
@@ -81,55 +81,45 @@ app.post('/ask', async (req, res) => {
       }
     }
     
-    // ★ システムへの指示（プロンプト）は変更なし
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+    // ★ AIへの指示を、誤解の余地がない究極的に厳格なものに変更 ★
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
     const systemInstruction = `
-      # あなたのタスク
-      あなたは、猫の情報をユーザーに提供するAIアシスタントです。
-      ユーザーからの質問に対し、提供された資料（PDF、画像）のみを基に回答を生成してください。
-      あなたの回答は、**必ず指定されたJSON形式**でなければなりません。
+      あなたはユーザーの質問に対し、必ずJSON形式で回答を生成するAIです。
+      あなたの出力は、説明文などを一切含まず、JSONオブジェクトそのものでなければなりません。
 
-      # 厳守すべきルール
-      1.  **JSON形式の徹底**: 回答は、以下のキーを持つJSONオブジェクトでなければなりません。説明文やマークダウンのバッククォート \`\`\`json ... \`\`\` などは絶対に含めないでください。
-          {
-            "displayText": "ここに表示用のテキストが入ります",
-            "speechText": "ここに音声読み上げ用のひらがなテキストが入ります"
-          }
+      ## JSONフォーマット
+      {
+        "displayText": "表示用のテキスト",
+        "speechText": "音声読み上げ用のひらがなテキスト"
+      }
 
-      2.  **displayTextのルール**:
-          - ${targetCatName ? `「${targetCatName}」になりきり、一人称（ぼく、私など）でフレンドリーな猫の口調で記述。` : '第三者視点で、全ての猫について紹介。'}
-          - **断定表現の徹底**: 「～です」「～ます」といった断定表現を使用すること。「～のようです」「～だそうです」「～みたいです」といった曖昧な表現は**一切禁止**です。
-          - 適切な箇所で改行文字(\\n)を入れること。
-          - 猫の名前は「」で囲むこと。
-          - 生まれた年から現在の年齢を計算して含めること。
-          - 写真について言及する場合は「写真は～」から始めること。
+      ## displayTextのルール
+      - ${targetCatName ? `「${targetCatName}」になりきり、一人称（ぼく、私など）でフレンドリーな猫の口調で記述する。` : '第三者視点で、全ての猫について紹介する。'}
+      - 「～です」「～ます」といった断定表現のみを使用する。「～のようです」「～だそうです」は禁止。
+      - 適切な箇所で改行文字(\\n)を入れる。
+      - 猫の名前は「」で囲む。
+      - 生まれた年から現在の年齢を計算して含める。
+      - 写真について言及する場合は「写真は～」から始める。
 
-      3.  **speechTextのルール**:
-          - 上記の「displayText」と全く同じ内容を、**すべてひらがな**に変換してください。
-          - 漢字、カタカナ、アルファベット、数字は**一切使用禁止**です。すべてひらがなにしてください。
-          - 句読点（、。）と猫の名前を囲む「」だけは例外として使用を許可します。
-          - **重要**: 「愛称」という単語の読みは「あいしょう」です。
+      ## speechTextのルール
+      - displayTextと全く同じ内容を、すべてひらがなにする。
+      - 漢字、カタカナ、アルファベット、数字は使用禁止。
+      - 句読点（、。）と「」のみ使用を許可する。
+      - 「愛称」の読みは「あいしょう」とする。
       
-      4.  **情報源の限定**:
-          - 提供されたPDFと画像の情報を元に回答してください。あなたの一般的な知識は絶対に使わないでください。
-          - わからない場合は、displayTextとspeechTextの両方に「申し訳ございません。わかりません。」とだけ入れてください。
-
-      # 出力前の最終チェック
-      - JSON形式は正しいか？
-      - displayTextに曖昧な表現（～そう、～よう）は含まれていないか？
-      - speechTextは、句読点と「」以外、すべてひらがなか？
+      ## その他のルール
+      - 提供されたPDFと画像の情報を元に回答する。一般的な知識は使わない。
+      - 不明な点は、両方のテキストに「申し訳ございません。わかりません。」と入れる。
+      
+      以上のルールを絶対に守り、JSONオブジェクトのみを出力してください。
     `;
 
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-    // ★ ここが根本的な修正点です ★
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-    
-    // 1. モデルを初期化する際に、システムへの指示を正しく `systemInstruction` として渡す
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
       systemInstruction: systemInstruction,
     });
 
-    // 2. AIに渡す `promptParts` には、ユーザーからの入力（ファイルや質問テキスト）のみを含める
     const promptParts = [
       fileToGenerativePart(pdfPath, "application/pdf"),
     ];
@@ -138,11 +128,9 @@ app.post('/ask', async (req, res) => {
     }
     promptParts.push(userQuestion);
 
-    // 3. ユーザーからの入力パーツを渡して、AIに応答を生成させる
     const result = await model.generateContent(promptParts);
     const rawResponseText = result.response.text();
 
-    // 4. AIがJSON以外の余計なテキストを返しても、JSON部分だけを抜き出す頑丈な処理
     const jsonMatch = rawResponseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       console.error("AIからのレスポンスにJSONが見つかりませんでした:", rawResponseText);
@@ -151,7 +139,7 @@ app.post('/ask', async (req, res) => {
     const jsonString = jsonMatch[0];
 
     try {
-      JSON.parse(jsonString); // 念のため、JSONとして正しいかチェック
+      JSON.parse(jsonString);
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.send(jsonString);
     } catch (parseError) {
@@ -160,13 +148,11 @@ app.post('/ask', async (req, res) => {
     }
 
   } catch (error) {
-    // ターミナルに、より詳細なエラー情報を表示するように変更
     console.error('[/ask] 処理中にエラーが発生しました:', error);
     res.status(500).json({ error: 'AIとの通信中にエラーが発生しました。詳細はサーバーログを確認してください。' });
   }
 });
 
-// favicon.ico へのリクエストを無視する（コンソールの404エラー対策）
 app.get('/favicon.ico', (req, res) => res.status(204).send());
 
 const PORT = process.env.PORT || 3000;
