@@ -129,14 +129,14 @@ app.post('/ask', async (req, res) => {
     if (targetImagePart) {
       userParts.push(targetImagePart);
     }
-    userParts.push({ text: userQuestion }); // ユーザーの質問も正しくオブジェクトにする
+    userParts.push({ text: userQuestion });
 
     // 3. 応答を生成する際に、正しいキー名でJSONモードを指定する
     const result = await model.generateContent({
         contents: [{ role: "user", parts: userParts }],
         generationConfig: {
-            // 4. 正しいキー名は "responseMimeType" (camelCase) です
-            responseMimeType: "application/json",
+            // 4. 正しいキー名は "response_mime_type" (アンダースコア区切り)
+            response_mime_type: "application/json",
         },
     });
 
