@@ -81,9 +81,6 @@ app.post('/ask', async (req, res) => {
       }
     }
     
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-    // ★ AIへの指示を、誤解の余地がない究極的に厳格なものに変更 ★
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
     const systemInstruction = `
       あなたはユーザーの質問に対し、必ずJSON形式で回答を生成するAIです。
       あなたの出力は、説明文などを一切含まず、JSONオブジェクトそのものでなければなりません。
@@ -128,24 +125,22 @@ app.post('/ask', async (req, res) => {
     }
     promptParts.push(userQuestion);
 
-    const result = await model.generateContent(promptParts);
-    const rawResponseText = result.response.text();
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+    // ★ ここが全ての解決策です。APIに「JSONで応答せよ」と公式に命令します。 ★
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+    const result = await model.generateContent({
+        contents: promptParts,
+        generationConfig: {
+            responseMimeType: "application/json",
+        },
+    });
 
-    const jsonMatch = rawResponseText.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error("AIからのレスポンスにJSONが見つかりませんでした:", rawResponseText);
-      throw new Error("AIが予期せぬ形式で応答しました。");
-    }
-    const jsonString = jsonMatch[0];
+    // APIがJSONを保証するので、複雑なテキスト解析は不要になります。
+    const responseText = result.response.text();
+    
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.send(responseText);
 
-    try {
-      JSON.parse(jsonString);
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.send(jsonString);
-    } catch (parseError) {
-      console.error("AIが生成したJSONのパースに失敗しました:", parseError, jsonString);
-      throw new Error("AIが不正な形式のJSONを生成しました。");
-    }
 
   } catch (error) {
     console.error('[/ask] 処理中にエラーが発生しました:', error);
