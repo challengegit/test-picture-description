@@ -23,9 +23,8 @@ if (!GEMINI_API_KEY) {
   process.exit(1);
 }
 
-// Google AIクライアントを初期化
+// ★ Google AIクライアントの初期化はここで行う
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
 // 猫の名前と画像ファイルのパスをマッピング（絶対パスで解決するように）
 const catImageMap = {
@@ -82,7 +81,8 @@ app.post('/ask', async (req, res) => {
       }
     }
     
-    const systemPrompt = `
+    // ★ システムへの指示（プロンプト）は変更なし
+    const systemInstruction = `
       # あなたのタスク
       あなたは、猫の情報をユーザーに提供するAIアシスタントです。
       ユーザーからの質問に対し、提供された資料（PDF、画像）のみを基に回答を生成してください。
@@ -119,25 +119,30 @@ app.post('/ask', async (req, res) => {
       - speechTextは、句読点と「」以外、すべてひらがなか？
     `;
 
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+    // ★ ここが根本的な修正点です ★
+    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+    
+    // 1. モデルを初期化する際に、システムへの指示を正しく `systemInstruction` として渡す
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      systemInstruction: systemInstruction,
+    });
+
+    // 2. AIに渡す `promptParts` には、ユーザーからの入力（ファイルや質問テキスト）のみを含める
     const promptParts = [
-      systemPrompt,
       fileToGenerativePart(pdfPath, "application/pdf"),
     ];
-    
-    if(targetImagePart) {
+    if (targetImagePart) {
       promptParts.push(targetImagePart);
     }
     promptParts.push(userQuestion);
 
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-    // ★ ここからが、AIの失敗を許容する頑丈な処理です ★
-    // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-
-    // 1. responseMimeTypeを指定せず、プレーンテキストとしてレスポンスを受け取る
-    const result = await model.generateContent({ contents: promptParts });
+    // 3. ユーザーからの入力パーツを渡して、AIに応答を生成させる
+    const result = await model.generateContent(promptParts);
     const rawResponseText = result.response.text();
 
-    // 2. 受け取ったテキストから、JSON部分だけを抜き出す
+    // 4. AIがJSON以外の余計なテキストを返しても、JSON部分だけを抜き出す頑丈な処理
     const jsonMatch = rawResponseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       console.error("AIからのレスポンスにJSONが見つかりませんでした:", rawResponseText);
@@ -145,10 +150,8 @@ app.post('/ask', async (req, res) => {
     }
     const jsonString = jsonMatch[0];
 
-    // 3. 抜き出したJSON文字列をクライアントに送信する
-    //    念のため、ここでJSONとして正しいかチェックする
     try {
-      JSON.parse(jsonString); // パースできるか試す
+      JSON.parse(jsonString); // 念のため、JSONとして正しいかチェック
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.send(jsonString);
     } catch (parseError) {
@@ -157,8 +160,9 @@ app.post('/ask', async (req, res) => {
     }
 
   } catch (error) {
-    console.error('[/ask] 最終的なエラー発生:', error);
-    res.status(500).json({ error: 'AIとの通信中にエラーが発生しました。' });
+    // ターミナルに、より詳細なエラー情報を表示するように変更
+    console.error('[/ask] 処理中にエラーが発生しました:', error);
+    res.status(500).json({ error: 'AIとの通信中にエラーが発生しました。詳細はサーバーログを確認してください。' });
   }
 });
 
