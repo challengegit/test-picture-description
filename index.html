@@ -5,9 +5,8 @@
     <title>私の猫ちゃんたち</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-      html, body {
-        margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans CJK JP", "Yu Gothic", sans-serif; color: #333; overflow: hidden; user-select: none;
-      }
+      /* CSSは変更なし */
+      html, body { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans CJK JP", "Yu Gothic", sans-serif; color: #333; overflow: hidden; user-select: none; }
       .main-container { display: flex; height: 100vh; }
       .cats-area { flex: 0 0 60%; overflow-y: auto; padding: 24px; box-sizing: border-box; }
       .resizer { flex: 0 0 10px; background-color: #f1f1f1; cursor: col-resize; border-left: 1px solid #ddd; border-right: 1px solid #ddd; }
@@ -23,44 +22,19 @@
       #answer-area { white-space: pre-wrap; word-wrap: break-word; margin: 0; }
       .cat-container { margin-bottom: 25px; }
       .cat-container h3 { margin-bottom: 5px; }
-      .cat-container img {
-          display: block;
-          max-width: 100%;
-          height: auto;
-          border-radius: 8px;
-          box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-      }
-      #audio-controls {
-        display: none;
-        margin-top: 15px;
-        display: flex;
-        gap: 10px;
-      }
-      #play-pause-button, #stop-button {
-        padding: 8px 16px;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-        font-weight: bold;
-        color: white;
-        font-size: 14px;
-      }
+      .cat-container img { display: block; max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+      #audio-controls { display: none; margin-top: 15px; display: flex; gap: 10px; }
+      #play-pause-button, #stop-button { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; font-size: 14px; }
       #play-pause-button { background-color: #28a745; }
       #play-pause-button:hover { background-color: #218838; }
       #stop-button { background-color: #dc3545; }
       #stop-button:hover { background-color: #c82333; }
-      
-      @media (max-width: 768px) {
-        html, body { overflow: auto; }
-        .main-container { flex-direction: column; height: auto; }
-        .resizer { display: none; }
-        #qa-section { min-width: unset; border-top: 2px solid #ddd; }
-      }
+      @media (max-width: 768px) { html, body { overflow: auto; } .main-container { flex-direction: column; height: auto; } .resizer { display: none; } #qa-section { min-width: unset; border-top: 2px solid #ddd; } }
     </style>
 </head>
 <body>
-
     <div class="main-container">
+        <!-- HTMLの構造は変更なし -->
         <div class="cats-area">
             <h1>こんにちは、私の可愛い猫ちゃんたち！</h1>
             <div class="cat-container"><h3>１：ぴの</h3><img src="images/pino.jpg" alt="猫の「ぴの」"></div>
@@ -96,9 +70,13 @@
         const playPauseButton = document.getElementById('play-pause-button');
         const stopButton = document.getElementById('stop-button');
 
+        // ★ 音声再生用のテキストを保持する変数
+        let speechTextForAudio = null;
+
         askButton.addEventListener('click', async function() {
           speechSynthesis.cancel();
           audioControls.style.display = 'none';
+          speechTextForAudio = null;
 
           const userQuestion = questionInput.value;
           if (!userQuestion) {
@@ -121,26 +99,64 @@
               throw new Error(errorData.error || 'サーバーでエラーが発生しました。');
             }
             
+            // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+            // ★ ここからがハイブリッドストリームを処理する新しいロジックです ★
+            // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
             let isFirstChunk = true;
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             
+            // ストリーム処理用の変数を初期化
+            const startMarker = "||SPEECH_JSON_START||";
+            const endMarker = "||SPEECH_JSON_END||";
+            let isParsingJson = false;
+            let jsonBuffer = "";
+            let fullText = ""; // ストリーム全体のテキストを保持
+
             while (true) {
               const { value, done } = await reader.read();
-              if (done) {
-                if (answerArea.textContent && !answerArea.textContent.includes('エラー')) {
-                  audioControls.style.display = 'flex';
-                  playPauseButton.textContent = '再生 ▶';
-                }
-                break;
-              }
+              if (done) break;
+
               if(isFirstChunk) {
-                answerArea.textContent = '';
+                answerArea.textContent = ''; // 「考えています...」をクリア
                 isFirstChunk = false;
               }
-              const chunkText = decoder.decode(value);
-              answerArea.textContent += chunkText;
+              
+              let chunkText = decoder.decode(value, { stream: true });
+              fullText += chunkText;
+
+              if (isParsingJson) {
+                  // JSON解析モードの場合、バッファにデータを追加
+                  jsonBuffer += chunkText;
+              } else {
+                  // 通常の表示モードの場合
+                  if (fullText.includes(startMarker)) {
+                      // スタートマーカーを見つけたらモード切り替え
+                      const parts = fullText.split(startMarker);
+                      answerArea.textContent = parts[0]; // マーカーより前の部分だけを表示
+                      jsonBuffer = parts[1] || "";
+                      isParsingJson = true;
+                  } else {
+                      // マーカーがまだなければ、そのまま表示
+                      answerArea.textContent = fullText;
+                  }
+              }
             }
+
+            // ストリーム完了後、JSONを解析
+            if (jsonBuffer.includes(endMarker)) {
+                const jsonString = jsonBuffer.substring(0, jsonBuffer.indexOf(endMarker));
+                try {
+                    const speechData = JSON.parse(jsonString);
+                    speechTextForAudio = speechData.speechText;
+                    // 音声データが正常に取得できたらコントロールボタンを表示
+                    audioControls.style.display = 'flex';
+                    playPauseButton.textContent = '再生 ▶';
+                } catch (e) {
+                    console.error("JSONの解析に失敗しました:", e, jsonString);
+                }
+            }
+
           } catch (error) {
             console.error('通信エラー:', error);
             answerArea.textContent = 'エラーが発生しました: ' + error.message;
@@ -150,23 +166,20 @@
         });
 
         // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-        // ★ ここからが、ふりがなと声質調整に対応した音声コントロールのロジックです ★
+        // ★ 音声コントロールのロジックは以前のままでOKです ★
         // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
-
-        // 利用可能な日本語の音声リストを保持する変数
         let japaneseVoices = [];
         function loadVoices() {
             japaneseVoices = speechSynthesis.getVoices().filter(v => v.lang === 'ja-JP');
         }
-        // ブラウザが音声リストを読み込んだ時にリストを更新する
         loadVoices();
         if (speechSynthesis.onvoiceschanged !== undefined) {
             speechSynthesis.onvoiceschanged = loadVoices;
         }
 
-        // 再生/一時停止ボタンの処理
         playPauseButton.addEventListener('click', function() {
-          if (!answerArea.textContent || answerArea.textContent.includes('エラー')) return;
+          // ★ 保持しておいた音声用テキストを使う
+          if (!speechTextForAudio) return;
 
           if (speechSynthesis.speaking && !speechSynthesis.paused) {
             speechSynthesis.pause();
@@ -180,24 +193,15 @@
 
           speechSynthesis.cancel();
           
-          const originalText = answerArea.textContent;
-          // 正規表現で「漢字(ふりがな)」の形式を「ふりがな」に置換し、音声再生用のテキストを作成
-          // 例: 「彼の尻尾(しっぽ)は長い」 -> 「彼のしっぽは長い」
-          const forSpeechText = originalText.replace(/([\u4e00-\u9faf々〇]+)\(([\u3040-\u309f]+)\)/g, '$2');
-          
-          const utterance = new SpeechSynthesisUtterance(forSpeechText);
+          const utterance = new SpeechSynthesisUtterance(speechTextForAudio);
 
-          // --- 声質を調整 ---
+          // 声質を調整
           utterance.lang = 'ja-JP';
-          utterance.pitch = 1.6; // 声の高さを設定 (1.0が通常。1.5-2.0で高くなる)
-          utterance.rate = 1.2;  // 話す速度を設定 (1.0が通常。少し早口で元気な感じに)
-          
-          // 利用可能な日本語音声があれば、それを設定する（環境依存）
+          utterance.pitch = 1.6;
+          utterance.rate = 1.2;
           if (japaneseVoices.length > 0) {
-            // "Google" の名前が入っている声を優先的に使う（より自然な場合が多いため）
             utterance.voice = japaneseVoices.find(v => v.name.includes('Google')) || japaneseVoices[0];
           }
-          // --------------------
 
           utterance.onstart = () => { playPauseButton.textContent = '一時停止 ⏸'; };
           utterance.onpause = () => { playPauseButton.textContent = '再開 ▶'; };
@@ -207,7 +211,6 @@
           speechSynthesis.speak(utterance);
         });
 
-        // 停止ボタンの処理
         stopButton.addEventListener('click', function() {
           speechSynthesis.cancel();
           playPauseButton.textContent = '再生 ▶';
