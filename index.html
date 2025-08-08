@@ -78,9 +78,9 @@
             
             <div id="suggestion-buttons">
               <button class="suggestion-btn">全員紹介して</button>
-              <button class="suggestion-btn">「ぴの」のこと教えて</button>
-              <button class="suggestion-btn">「るか」のこと教えて</button>
-              <button class="suggestion-btn">２階の吹き抜けから落ちてきたときのこと教えて</button>
+              <button class="suggestion-btn">ぴののこと教えて</button>
+              <button class="suggestion-btn">るかのこと教えて</button>
+              <button class="suggestion-btn">2階の吹き抜けから落ちてきたときのこと教えて</button>
             </div>
 
             <button id="ask-button">質問する</button>
@@ -117,9 +117,22 @@
               body: JSON.stringify({ question: userQuestion }),
             });
 
+            // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+            // ★ ここが全ての解決策です。エラー処理を頑丈にします。 ★
+            // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
             if (!response.ok) {
-              const errorData = await response.json();
-              throw new Error(errorData.error || 'サーバーでエラーが発生しました。');
+              // まず、エラー応答をテキストとして受け取る
+              const errorText = await response.text();
+              let errorMessage = errorText;
+              try {
+                // テキストがJSON形式なら、中身を解析して使う
+                const errorData = JSON.parse(errorText);
+                errorMessage = errorData.error || errorText;
+              } catch (e) {
+                // JSONでなければ、テキストそのものをエラーメッセージとする
+                errorMessage = errorText || 'サーバーで不明なエラーが発生しました。';
+              }
+              throw new Error(errorMessage);
             }
             
             let isFirstChunk = true;
