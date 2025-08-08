@@ -30,6 +30,29 @@
           border-radius: 8px;
           box-shadow: 0 4px 8px rgba(0,0,0,0.1);
       }
+      /* ★★★★★★★★★★★★★★★★★★★★★★★★★★★★ */
+      /* ★ 質問サジェストボタン用のCSSを追加 ★ */
+      /* ★★★★★★★★★★★★★★★★★★★★★★★★★★★★ */
+      #suggestion-buttons {
+        display: flex;
+        flex-wrap: wrap; /* ボタンが多ければ折り返す */
+        gap: 8px; /* ボタン間の隙間 */
+        margin-bottom: 15px; /* ボタン群と質問ボタンの間のマージン */
+      }
+      .suggestion-btn {
+        padding: 8px 12px;
+        font-size: 14px;
+        background-color: #6c757d; /* グレー系の色 */
+        color: white;
+        border: none;
+        border-radius: 16px; /* 角を丸くしてタグっぽくする */
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+      .suggestion-btn:hover {
+        background-color: #5a6268;
+      }
+
       @media (max-width: 768px) {
         html, body { overflow: auto; }
         .main-container { flex-direction: column; height: auto; }
@@ -55,11 +78,22 @@
             <h2>AIに質問してみよう！</h2>
             <p style="margin-top:0;">「ぴのは写真で何してる？」や「全員紹介して」のように質問してね。</p>
             <input type="text" id="question-input" placeholder="ここに質問を入力...">
+            
+            <!-- ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★ */
+            /* ★ 質問サジェストボタンのHTMLをここに追加 ★ */
+            /* ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★ */ -->
+            <div id="suggestion-buttons">
+              <button class="suggestion-btn">全員紹介して</button>
+              <button class="suggestion-btn">ぴののこと教えて</button>
+              <button class="suggestion-btn">一番の甘えん坊は誰？</button>
+              <button class="suggestion-btn">一番最近うちに来たのは誰？</button>
+            </div>
+
             <button id="ask-button">質問する</button>
+
             <div id="answer-container">
                 <h3>答え：</h3>
                 <p id="answer-area">ここに答えが表示されます</p>
-                <!-- ★★★ 音声再生ボタンを削除 ★★★ -->
             </div>
         </div>
     </div>
@@ -69,8 +103,12 @@
         const questionInput = document.getElementById('question-input');
         const askButton = document.getElementById('ask-button');
         const answerArea = document.getElementById('answer-area');
+        // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★ */
+        // ★ 質問サジェストボタン群の要素を取得 ★ */
+        // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★ */
+        const suggestionButtonsContainer = document.getElementById('suggestion-buttons');
 
-        // ★★★ ストリーミング表示のためのシンプルなスクリプト ★★★
+
         askButton.addEventListener('click', async function() {
           const userQuestion = questionInput.value;
           if (!userQuestion) {
@@ -113,6 +151,21 @@
             answerArea.textContent = 'エラーが発生しました: ' + error.message;
           } finally {
             askButton.disabled = false;
+          }
+        });
+        
+        // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★ */
+        // ★ サジェストボタンがクリックされた時の処理を追加 ★ */
+        // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★ */
+        suggestionButtonsContainer.addEventListener('click', function(event) {
+          // クリックされたのがボタン(.suggestion-btn)の場合のみ処理
+          if (event.target.classList.contains('suggestion-btn')) {
+            // ボタンのテキストを取得
+            const questionText = event.target.textContent;
+            // 質問入力欄にテキストを設定
+            questionInput.value = questionText;
+            // 「質問する」ボタンをクリックしてAIに質問を実行
+            askButton.click();
           }
         });
 
