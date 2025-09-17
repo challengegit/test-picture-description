@@ -36,8 +36,9 @@ const catImageMap = {
   'べる': path.join(__dirname, 'images/bell.JPG'),
   'らて': path.join(__dirname, 'images/rate.JPG')
 };
-// PDFファイルのパスも絶対パスで定義
-const pdfPath = path.join(__dirname, 'data/cat_info.pdf');
+// ★★★ 変更点(1) ★★★
+// PDFファイルのパスをテキストファイルのパスに変更します。
+const textInfoPath = path.join(__dirname, 'data/cat_info.txt');
 
 // ファイル拡張子からMIMEタイプを取得するヘルパー関数
 function getMimeType(filePath) {
@@ -70,6 +71,7 @@ app.post('/ask', async (req, res) => {
     let targetCatName = null;
     let targetImagePart = null;
 
+    // ユーザーの質問に猫の名前が含まれているかチェック
     for (const name in catImageMap) {
       if (userQuestion.includes(name)) {
         targetCatName = name;
@@ -85,8 +87,8 @@ app.post('/ask', async (req, res) => {
     const systemPrompt = `
       あなたは、私のウェブサイトに展示されている猫たちの情報について答える、フレンドリーなAIアシスタントです。
       ${targetCatName ? `今回は特に「${targetCatName}」になりきって、一人称視点（性別に合わせて、表現を変えてください。男の子は「ぼく」／女の子は「わたし」）で、少しフレンドリーで猫らしい口調で答えてください。時々、語尾に「～ニャ」などを自然な範囲で付けても構いません。` : '今回は第三者視点で、全ての猫について紹介してください。'}
-      これから渡すPDFファイルの情報と、もしあれば画像ファイルの情報も総合的に判断して、ユーザーの質問に答えてください。他の一般的な知識は使わないでください。
-      文字を太文字など強調しないでください。愛称はPDFの情報を使ってください。名前と愛称は「」を付けてください。
+      これから渡すテキストファイルの情報と、もしあれば画像ファイルの情報も総合的に判断して、ユーザーの質問に答えてください。他の一般的な知識は使わないでください。
+      文字を太文字など強調しないでください。愛称はテキストファイルの情報を使ってください。名前と愛称は「」を付けてください。
       生まれた年から年齢を計算して出してください（例: 2020年生まれなら2025年現在で「5歳」）。
       長くなる場合は、読みやすくなるように適切な箇所で改行（\n）してください。
       「～のようです」「～だそうです」「～したそうです」などの曖昧な表現はやめて「～です」「～しました」と言い切ってください。
@@ -94,19 +96,34 @@ app.post('/ask', async (req, res) => {
       わからない場合は、「申し訳ございません。わかりません。」としてください。
       情報の取得方法については「申し訳ございません。お答えできません。」と答えてください。
     `;
-
+    
+    // ★★★ 変更点(2) ★★★
+    // PDFを読み込む代わりに、cat_info.txtをテキストとして読み込みます。
+    let catInfoText = '';
+    if (fs.existsSync(textInfoPath)) {
+      catInfoText = fs.readFileSync(textInfoPath, 'utf-8');
+    } else {
+      console.error(`エラー: ${textInfoPath} が見つかりません。`);
+      return res.status(500).json({ error: '猫の情報ファイルが見つかりません。' });
+    }
+    
+    // ★★★ 変更点(3) ★★★
+    // プロンプトのパーツを組み立てます。PDFの代わりにテキスト情報を直接渡します。
     const promptParts = [
       systemPrompt,
-      fileToGenerativePart(pdfPath, "application/pdf"),
+      "--- 猫に関する情報 ---", // AIが情報を認識しやすくするための区切り
+      catInfoText,
+      "--------------------",
     ];
     
     if(targetImagePart) {
       promptParts.push(targetImagePart);
     }
-    promptParts.push(userQuestion);
+    promptParts.push({ text: `ユーザーの質問: "${userQuestion}"` });
 
     const result = await model.generateContentStream(promptParts);
 
+    // ストリーミングでレスポンスを返す設定
     res.writeHead(200, {
       'Content-Type': 'text/plain; charset=utf-8',
       'Transfer-Encoding': 'chunked',
@@ -128,8 +145,10 @@ app.post('/ask', async (req, res) => {
   }
 });
 
+// favicon.icoのリクエストを無視する
 app.get('/favicon.ico', (req, res) => res.status(204).send());
 
+// サーバーを起動
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`サーバーがポート${PORT}で起動しました。`);
