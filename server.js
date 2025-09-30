@@ -25,7 +25,7 @@ if (!GEMINI_API_KEY) {
 
 // Google AIクライアントの初期化
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
 // 猫の名前と画像ファイルのパスをマッピング（絶対パスで解決するように）
 const catImageMap = {
